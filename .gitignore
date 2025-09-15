@@ -1,3 +1,8 @@
+data/
+*.pkl
+*.out
+*.err
+results/failed/
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[codz]
