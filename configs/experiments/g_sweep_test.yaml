@@ -1,0 +1,30 @@
+# Test parameter sweep - minimal example
+simulation:
+  nb_steps: 100000  # Shorter for testing
+  obj_rate: 3.44
+  with_decay: false
+  with_plasticity: false  
+  TR: 0.72
+  burnout: 8
+  over: 
+    #param_name: sc_matrix  # or 'param'
+    param_name: seed  # or 'param'
+    range: {start: 1, end: 10, step: 1}
+    
+  parallel: true
+grid: 
+  G: {start: 0.5, end: 2.5, step: 0.125}
+data:  
+  test_mode: true  
+  max_subjects_test: 2
+  sc_root: "SCs"  
+output:
+  save_full_outputs: true  
+  observables:
+    - name: fc
+      on: bold
+      params: { zero_diag: true }  
+  
+experiment:
+  description: "G sweep in SLURM"
+  version: "1.0"

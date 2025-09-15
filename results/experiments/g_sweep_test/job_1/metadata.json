@@ -1,0 +1,67 @@
+{
+  "experiment_id": "g_sweep_test",
+  "original_config_path": "/network/iss/home/ivan.mindlin/Repos/fastHDMF/configs/experiments/g_sweep_test.yaml",
+  "start_time": "2025-09-15T15:47:24.038706",
+  "config": {
+    "simulation": {
+      "nb_steps": 100000,
+      "obj_rate": 3.44,
+      "with_decay": false,
+      "with_plasticity": false,
+      "TR": 0.72,
+      "burnout": 8,
+      "over": {
+        "param_name": "seed",
+        "range": {
+          "start": 1,
+          "end": 10,
+          "step": 1
+        }
+      },
+      "parallel": true
+    },
+    "grid": {
+      "G": {
+        "start": 0.5,
+        "end": 2.5,
+        "step": 0.125
+      }
+    },
+    "data": {
+      "test_mode": true,
+      "max_subjects_test": 2,
+      "sc_root": "SCs"
+    },
+    "output": {
+      "save_full_outputs": true,
+      "observables": [
+        {
+          "name": "fc",
+          "true": "bold",
+          "params": {
+            "zero_diag": true
+          }
+        }
+      ]
+    },
+    "experiment": {
+      "description": "G sweep in SLURM",
+      "version": "1.0"
+    }
+  },
+  "status": "completed",
+  "observables_spec": [
+    {
+      "name": "fc",
+      "signal": [
+        "bold"
+      ],
+      "params": {
+        "zero_diag": true
+      }
+    }
+  ],
+  "end_time": "2025-09-15T15:49:59.685899",
+  "total_patients": 5,
+  "failed_simulations": []
+}
