@@ -21,6 +21,7 @@ def main():
     parser.add_argument('--job-id', help='SLURM array job ID', type=int, default=None)
     parser.add_argument('--job-count', help='Total number of SLURM array jobs', type=int, default=None)
     parser.add_argument('--list-configs', action='store_true', help='List available config files')
+    parser.add_argument('--cpus', type=int, default=None, help='Max CPUs/workers (overrides default 32)')
     print(project_root)
     args = parser.parse_args()
     print(args)
@@ -54,7 +55,8 @@ def main():
             job_id=args.job_id if args.job_id is not None else os.getenv('SLURM_ARRAY_TASK_ID'),
             job_count=args.job_count if args.job_count is not None else os.getenv('SLURM_ARRAY_TASK_COUNT'),
         )
-        
+        # Store user override for parallel CPUs
+        experiment_manager.max_cpus = args.cpus
         # after init, get experiment_dir and id
         experiment_dir = experiment_manager.experiment_dir
         experiment_id = experiment_manager.current_experiment

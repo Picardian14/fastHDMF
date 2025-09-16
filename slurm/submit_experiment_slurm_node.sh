@@ -71,82 +71,42 @@ fi
 
 CONFIG_FILENAME="${EXPERIMENTS_DIR}/${EXPERIMENT_ID}.yaml"
 
-echo "Submitting SLURM array job for experiment: $EXPERIMENT_ID (config: $CONFIG_FILENAME)"
+echo "Submitting SLURM node job for experiment: $EXPERIMENT_ID (config: $CONFIG_FILENAME)"
 
-# Calculate grid size and suggest array size
 echo "Calculating grid size..."
-
+# Calculate grid size and show values
 GRID_INFO=$(python utils/calculate_grid_size.py "$CONFIG_FILENAME")
 echo "$GRID_INFO"
-
-# Extract grid size from output
+# Extract grid size
 GRID_SIZE=$(echo "$GRID_INFO" | grep "Total grid combinations:" | awk '{print $4}')
-SUGGESTED_JOBS=$(echo "$GRID_INFO" | grep "Suggested SLURM array size:" | awk '{print $5}')
 
 echo
 echo "Grid size: $GRID_SIZE combinations"
-echo "Suggested array size: $SUGGESTED_JOBS jobs"
-echo
-
-# Ask user for number of jobs
-read -rp "Enter number of SLURM array jobs (or press Enter for suggested: $SUGGESTED_JOBS): " USER_JOBS
-
-if [ -z "$USER_JOBS" ]; then
-    ARRAY_SIZE=$SUGGESTED_JOBS
-else
-    ARRAY_SIZE=$USER_JOBS
-fi
-
-# Validate array size
-if ! [[ "$ARRAY_SIZE" =~ ^[0-9]+$ ]] || [ "$ARRAY_SIZE" -lt 1 ]; then
-    echo "Invalid array size: $ARRAY_SIZE" >&2
-    exit 1
-fi
-
-if [ "$ARRAY_SIZE" -gt "$GRID_SIZE" ]; then
-    echo "Warning: Array size ($ARRAY_SIZE) is larger than grid size ($GRID_SIZE). Setting to grid size."
-    ARRAY_SIZE=$GRID_SIZE
-fi
-
-echo "Using array size: $ARRAY_SIZE (0-$((ARRAY_SIZE-1)))"
 
 # Ask user for number of CPUs per task
-read -rp "Enter number of CPUs per task (or press Enter for default: 1): " USER_CPUS
+read -rp "Enter number of CPUs for this job (or press Enter for default: 1): " USER_CPUS
 if [ -z "$USER_CPUS" ]; then
     CPUS=1
 else
     CPUS=$USER_CPUS
 fi
-# Validate CPUs per task
+# Validate CPUs
 if ! [[ "$CPUS" =~ ^[0-9]+$ ]] || [ "$CPUS" -lt 1 ]; then
-    echo "Invalid CPUs per task: $CPUS" >&2
+    echo "Invalid CPUs: $CPUS" >&2
     exit 1
 fi
 
-echo "Using CPUs per task: $CPUS"
+echo "Using CPUs: $CPUS"
 
 echo
 echo "Final configuration:"
 echo "  Experiment ID: $EXPERIMENT_ID"
 echo "  Config file: $CONFIG_FILENAME"
 echo "  Grid size: $GRID_SIZE"
-echo "  Array size: $ARRAY_SIZE"
-echo "  CPUs per task: $CPUS"
+echo "  CPUs: $CPUS"
 echo
 
-# Ask for CPU override
-read -rp "Enter number of CPUs per task (or press Enter for default: $CPUS): " USER_CPUS_OVERRIDE
-if [ -n "$USER_CPUS_OVERRIDE" ]; then
-    CPUS=$USER_CPUS_OVERRIDE
-fi
+# Submit the node job and capture the job ID
+JOB_ID=$(sbatch --parsable --cpus-per-task=$CPUS slurm/run_experiment_node.sh "$EXPERIMENT_ID" --cpus $CPUS)
 
-# Submit the array job and capture the job ID
-JOB_ID=$(sbatch --parsable --cpus-per-task=$CPUS --array=0-$((ARRAY_SIZE-1)) slurm/run_experiment_array.sh "$EXPERIMENT_ID" "$ARRAY_SIZE" --cpus $CPUS)
-
-echo "Array job submitted with ID: $JOB_ID"
-
-# Submit the integration job with dependency on the array job
-INTEGRATION_JOB_ID=$(sbatch --parsable --dependency=afterok:$JOB_ID slurm/integrate_results.sh "$EXPERIMENT_ID")
-
-echo "Integration job submitted with ID: $INTEGRATION_JOB_ID"
-echo "Integration will run after all array jobs complete"
+echo "Node job submitted with ID: $JOB_ID"

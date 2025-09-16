@@ -152,7 +152,6 @@ class HDMFResultsPlotter(ResultsPlotter):
         if show_plot:
             plt.show()
         
-
     # ---------------------- Time series plots (Rates / BOLD) ---------------------- #
     def plot_rates(
         self,
@@ -501,6 +500,7 @@ class HDMFResultsPlotter(ResultsPlotter):
         if show_plot:
             plt.show()
         return fig
+
 
     # ---------------------- Helpers ---------------------- #
     def _extract_1d_timeseries(

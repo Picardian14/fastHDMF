@@ -6,6 +6,7 @@ import sys
 import yaml
 import numpy as np
 from pathlib import Path
+DATAPATH = Path(__file__).parent.parent / "data" / "raw"
 
 def calculate_grid_size(config_path):
     """Calculate total grid size from config file"""
@@ -50,7 +51,8 @@ def calculate_grid_size(config_path):
         print(f"  values: {val_list}")
     
     # Handle optional "over" parameters (e.g., SC matrices selection)
-    over = config.get("over", {})
+    sim = config.get("simulation", {})
+    over = sim.get("over", {}) or config.get("over", {})
     if over:
         print("\nOver parameters:")
         total_over = 1
@@ -78,7 +80,33 @@ def calculate_grid_size(config_path):
             except Exception:
                 over_list = list(values)
             print(f"  values: {over_list}")
-        print(f"\nTotal SC matrices (over combinations): {total_over}")
+        print(f"\nTotal over combinations: {total_over}")
+        # Count SC matrices in specified sc_root
+        data_cfg = config.get("data", {})
+        sc_root = data_cfg.get("sc_root", "SCs")
+        sc_dir = Path(DATAPATH / sc_root)
+        if sc_dir.exists() and sc_dir.is_dir():
+            sc_files = list(sc_dir.glob('*.csv'))
+            sc_count = len(sc_files)
+        else:
+            sc_count = 0
+        print(f"SC matrices found in '{sc_root}': {sc_count}")
+        # Compute items per task (SC matrices × over values)
+        items_per_task = total_over * sc_count
+        print(f"Items per task (SC matrices × over values): {items_per_task}")
+    else:
+        # No over parameters: count SC matrices only
+        data_cfg = config.get("data", {})
+        sc_root = data_cfg.get("sc_root", "SCs")
+        sc_dir = Path(DATAPATH / sc_root)
+        if sc_dir.exists() and sc_dir.is_dir():
+            sc_files = list(sc_dir.glob('*.csv')) 
+            sc_count = len(sc_files)
+        else:
+            sc_count = 0
+        print(f"SC matrices found in '{sc_root}': {sc_count}")
+        items_per_task = sc_count
+        print(f"Items per task (SC matrices): {items_per_task}")
     return total_combinations
 
 def suggest_array_size(grid_size, max_jobs=None):

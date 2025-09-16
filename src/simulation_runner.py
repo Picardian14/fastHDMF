@@ -205,28 +205,21 @@ class HDMFSimulationRunner:
                 item = {'sc_matrix': sc_matrix}
                 items.append((ipp, item))
         else:
-            param_name = over_config.get('param_name', 'param')
-            
-            if param_name == 'sc_matrix':
-                # Special case: iterating over sc_matrices only
-                for ipp, sc_matrix in sc_matrices.items():
-                    item = {'sc_matrix': sc_matrix}
+
+            # Assume that you iterate over 1 parameter (x amount of SC_matrices)
+            param_name = list(over_config.keys())[0]
+            param_values = self._generate_parameter_values(over_config[param_name])
+
+            # Cartesian product between patients and parameter values
+            for ipp, sc_matrix in sc_matrices.items():
+                for param_value in param_values:
+                    item = {
+                        'sc_matrix': sc_matrix,
+                        'param_key': param_name,
+                        'param_value': param_value
+
+                    }
                     items.append((ipp, item))
-            else:
-                # Create parameter values to iterate over
-                range_config = over_config.get('range', {})
-                param_values = self._generate_parameter_values(range_config)
-
-                # Cartesian product between patients and parameter values
-                for ipp, sc_matrix in sc_matrices.items():
-                    for param_value in param_values:
-                        item = {
-                            'sc_matrix': sc_matrix,
-                            'param_key': param_name,
-                            'param_value': param_value
-
-                        }
-                        items.append((ipp, item))
         
         return items
         
@@ -294,7 +287,10 @@ class HDMFSimulationRunner:
                 observable_grids[obs_key] = g
             return g
 
-        n_jobs = min(len(items), min(32, os.cpu_count() or 1))
+        # Determine parallel job cap: use user-specified override if provided, else default 32
+        max_jobs = getattr(self.experiment_manager, 'max_jobs', None)
+        cap = max_jobs if (isinstance(max_jobs, int) and max_jobs > 0) else 32
+        n_jobs = min(len(items), min(cap, os.cpu_count() or 1))
         # --- Helpers ---
         def _run_one(current_task: Dict[str, Any], i: int, ipp: str, item_value: Any) -> Tuple[str, Optional[Dict[str, Any]]]:
             try:

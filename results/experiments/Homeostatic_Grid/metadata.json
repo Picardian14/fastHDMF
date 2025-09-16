@@ -1,0 +1,11 @@
+{
+  "experiment_id": "Homeostatic_Grid",
+  "status": "completed",
+  "end_time": "2025-09-15T18:27:31.187169",
+  "total_patients": 0,
+  "integrated_from_jobs": 1,
+  "original_job_folders": [
+    "job_1"
+  ],
+  "failed_simulations": []
+}

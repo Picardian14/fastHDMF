@@ -16,6 +16,19 @@ SINGULARITY_IMAGE=/network/iss/home/ivan.mindlin/ubuntu_focal_conda.sif
 EXPERIMENT_ID=$1
 JOB_COUNT=$2
 CONFIG_FILENAME=configs/experiments/${EXPERIMENT_ID}.yaml
-
+# Parse optional --cpus argument after job count
+CPUS=1
+shift 2
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --cpus)
+            CPUS="$2"
+            shift 2
+            ;;
+        *)
+            shift
+            ;;
+    esac
+done
 # Run Python script inside Singularity container with job info
-singularity exec $SINGULARITY_IMAGE bash -c "source /opt/anaconda/3/2023.07-2/base/etc/profile.d/conda.sh && conda activate fic && python3 src/run_experiment.py $CONFIG_FILENAME --job-id $SLURM_ARRAY_TASK_ID --job-count $JOB_COUNT"
+singularity exec $SINGULARITY_IMAGE bash -c "source /opt/anaconda/3/2023.07-2/base/etc/profile.d/conda.sh && conda activate fic && python3 src/run_experiment.py $CONFIG_FILENAME --job-id $SLURM_ARRAY_TASK_ID --job-count $JOB_COUNT --cpus $CPUS"

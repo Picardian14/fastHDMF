@@ -1,0 +1,28 @@
+# Default plotting style settings for fastHDMF
+matplotlib:
+  # Seaborn style name or matplotlib style
+  style: whitegrid
+  # Seaborn palette name
+  palette: husl
+  # Matplotlib rcParams overrides
+  rcParams:
+    figure.figsize: [10, 6]
+    axes.titlesize: 24
+    axes.labelsize: 20
+    xtick.labelsize: 18
+    ytick.labelsize: 18
+    legend.fontsize: 18    
+    font.sans-serif:
+      - Arial
+      - DejaVu Sans
+      - Liberation Sans
+    font.family: sans-serif
+    axes.spines.top: false
+    axes.spines.right: false
+colors:
+  identifiability: "#2E86AB"
+  structural_diff: "#A23B72"
+  correlation: "#F18F01"
+  bold: "#C73E1D"
+  rate: "#592E83"
+  gradient: "#1B4D3E"

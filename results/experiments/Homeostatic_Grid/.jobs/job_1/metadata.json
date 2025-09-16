@@ -1,0 +1,73 @@
+{
+  "experiment_id": "Homeostatic_Grid",
+  "original_config_path": "/network/iss/home/ivan.mindlin/Repos/fastHDMF/configs/experiments/Homeostatic_Grid.yaml",
+  "start_time": "2025-09-15T17:51:57.552625",
+  "config": {
+    "simulation": {
+      "nb_steps": 50000,
+      "obj_rate": 3.44,
+      "with_decay": true,
+      "with_plasticity": true,
+      "TR": 2.4,
+      "burnout": 8,
+      "over": {
+        "param_name": "G",
+        "range": {
+          "start": 0.25,
+          "end": 8.25,
+          "step": 0.25
+        }
+      },
+      "parallel": true
+    },
+    "grid": {
+      "lrj": {
+        "fun": "np.logspace",
+        "args": [
+          0,
+          2,
+          4
+        ]
+      },
+      "taoj": {
+        "fun": "np.logspace",
+        "args": [
+          2,
+          5,
+          4
+        ]
+      }
+    },
+    "data": {
+      "test_mode": true,
+      "max_subjects_test": 1,
+      "sc_root": "AAL"
+    },
+    "output": {
+      "save_full_outputs": true,
+      "observables": [
+        {
+          "name": "mean",
+          "true": "rates"
+        }
+      ]
+    },
+    "experiment": {
+      "description": "Homeostatic grid for objective rate 3.44. Used to then calculate LR->DECAY coefficients. Now supports custom parameter generation functions.",
+      "version": "1.1"
+    }
+  },
+  "status": "completed",
+  "observables_spec": [
+    {
+      "name": "mean",
+      "signal": [
+        "rates"
+      ],
+      "params": {}
+    }
+  ],
+  "end_time": "2025-09-15T17:52:30.864240",
+  "total_patients": 5,
+  "failed_simulations": []
+}
