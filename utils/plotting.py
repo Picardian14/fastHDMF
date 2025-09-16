@@ -21,16 +21,27 @@ class ResultsPlotter:
     consistent styling and labeling for various analysis plots.
     """
     
-    def __init__(self, config: Optional[Dict[str, Any]] = None, config_path: Optional[str] = None):
+    def __init__(self,
+                 config: Optional[Dict[str, Any]] = None,
+                 config_path: Optional[str] = None,
+                 style_config: Optional[Dict[str, Any]] = None,
+                 style_config_path: Optional[str] = None):
         """
-        Initialize the plotter with configuration and styling.
-        
+        Initialize the plotter with style and experiment configurations.
         Parameters:
-            config (Dict[str, Any], optional): Configuration dictionary
-            config_path (str, optional): Path to configuration YAML file
+            style_config (dict, optional): Plot styling config as dict
+            style_config_path (str, optional): Path to plotting_style YAML file
+            config (dict, optional): Experiment config dict (grid, simulation, etc.)
+            config_path (str, optional): Path to experiment config YAML file
         """
-        self.config = self._load_config(config, config_path)
+        # Load plotting style config (defaults to configs/plotting_style.yaml)
+        default_style = Path(__file__).parent.parent / 'configs' / 'plotting_style.yaml'
+        style_path = Path(style_config_path) if style_config_path else default_style
+        self.style_config = self._load_config(style_config, str(style_path))
+        # Apply style first
         self._setup_style()
+        # Load experiment configuration for parameter ranges
+        self.config = self._load_config(config, config_path)
         self._extract_parameter_ranges()
         
     def _load_config(self, config: Optional[Dict[str, Any]], config_path: Optional[str]) -> Dict[str, Any]:
@@ -45,27 +56,25 @@ class ResultsPlotter:
             return {}
     
     def _setup_style(self):
-        """Set up consistent styling for all plots."""
-        # Set seaborn style
-        sns.set_style("whitegrid")
-        sns.set_palette("husl")
-        
-        # Set matplotlib parameters for publication-quality plots
-        plt.rcParams.update({
-            'figure.figsize': (10, 6),
-            'axes.titlesize': 14,
-            'axes.labelsize': 12,
-            'xtick.labelsize': 10,
-            'ytick.labelsize': 10,
-            'legend.fontsize': 10,
-            'font.sans-serif': ['Arial', 'DejaVu Sans', 'Liberation Sans'],
-            'font.family': 'sans-serif',
-            'axes.spines.top': False,
-            'axes.spines.right': False,
-        })
-        
-        # Define color palette for different analysis types
-        self.colors = {
+        """Set up consistent styling for all plots based on style_config."""
+        # Matplotlib/seaborn style settings
+        mpl_cfg = self.style_config.get('matplotlib', {})
+        # Seaborn style
+        seaborn_style = mpl_cfg.get('style')
+        if seaborn_style:
+            sns.set_style(seaborn_style)
+        # Seaborn palette
+        palette = mpl_cfg.get('palette')
+        if palette:
+            sns.set_palette(palette)
+        # Matplotlib rcParams overrides
+        rc = mpl_cfg.get('rcParams', {})
+        if isinstance(rc, dict):
+            plt.rcParams.update(rc)
+        # Color definitions
+        colors_cfg = self.style_config.get('colors', {})
+        # Default fallback palette
+        default_colors = {
             'identifiability': '#2E86AB',
             'structural_diff': '#A23B72',
             'correlation': '#F18F01',
@@ -73,6 +82,8 @@ class ResultsPlotter:
             'rate': '#592E83',
             'gradient': '#1B4D3E'
         }
+        # Merge defaults with provided
+        self.colors = {**default_colors, **colors_cfg}
     
     def _extract_parameter_ranges(self):
         """Extract parameter ranges from configuration for labeling."""

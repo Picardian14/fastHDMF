@@ -12,7 +12,7 @@ from pathlib import Path
 project_root = Path(__file__).parent.parent.parent.parent.parent
 sys.path.insert(0, str(project_root / "src"))
 
-from modeling.HDMF.src.experiment_manager import ExperimentManager
+from src.experiment_manager import ExperimentManager
 
 def main():
     parser = argparse.ArgumentParser(description='Integrate results already ran as a SLURM job')
@@ -25,8 +25,9 @@ def main():
     print(f"Integrating experiment: {args.id}")
     
     try:
-        experiment_manager = ExperimentManager(project_root)
-        _ = experiment_manager.integrate_slurm_results(args.id)     
+        # manager auto-inits to results_dir under project_root, no config needed here
+        experiment_manager = ExperimentManager(project_root, results_dir=None)
+        _ = experiment_manager.integrate_slurm_results(args.id)
         print("\n✅Results got integrated")
 
     except Exception as e:

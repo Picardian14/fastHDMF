@@ -47,15 +47,17 @@ def main():
         print(f"Total SLURM jobs: {args.job_count}")
         
     try:
-        experiment_manager = ExperimentManager(project_root, results_dir="/network/iss/cohen/data/Ivan/fastHDMF/")
-        
-        # Use command line args if provided, otherwise fall back to environment variables
-        job_id = args.job_id if args.job_id is not None else os.getenv('SLURM_ARRAY_TASK_ID')
-        job_count = args.job_count if args.job_count is not None else os.getenv('SLURM_ARRAY_TASK_COUNT')
-        
-        experiment_dir, experiment_id = experiment_manager.setup_experiment(
-            config_path=args.config, job_id=job_id, job_count_str=job_count
+        experiment_manager = ExperimentManager(
+            project_root,
+            config_path=args.config,
+            results_dir=Path("/network/iss/cohen/data/Ivan/fastHDMF/"),
+            job_id=args.job_id if args.job_id is not None else os.getenv('SLURM_ARRAY_TASK_ID'),
+            job_count=args.job_count if args.job_count is not None else os.getenv('SLURM_ARRAY_TASK_COUNT'),
         )
+        
+        # after init, get experiment_dir and id
+        experiment_dir = experiment_manager.experiment_dir
+        experiment_id = experiment_manager.current_experiment
 
         # ExperimentManager now stores the ObservablesPipeline; runner will consume it.
         runner = HDMFSimulationRunner(project_root, experiment_manager)
