@@ -40,8 +40,8 @@ class BaseObservable:
             self.signal = tuple(signal)
         self.params = params or {}
 
-    def compute(self, outputs: Dict[str, np.ndarray], params: Dict[str, Any] | None = None,
-                config: Dict[str, Any] | None = None) -> Dict[str, Any]:
+    def compute(self, outputs: Dict[str, np.ndarray], params: Optional[Dict[str, Any]] = None,
+                config: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
         raise NotImplementedError
         
     def spec(self) -> Dict[str, Any]:
@@ -81,8 +81,8 @@ class FCObservable(BaseObservable):
     def __init__(self, signal: Union[str, Iterable[str]] = "bold", zero_diag: bool = True, **kwargs: Any) -> None:
         super().__init__(signal=signal, zero_diag=zero_diag, **kwargs)
 
-    def compute(self, outputs: Dict[str, np.ndarray], params: Dict[str, Any] | None = None,
-                config: Dict[str, Any] | None = None) -> Dict[str, Any]:
+    def compute(self, outputs: Dict[str, np.ndarray], params: Optional[Dict[str, Any]] = None,
+                config: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
         res: Dict[str, Any] = {}
         for var in self.signal:
             ts = _get_ts(outputs, var)
@@ -104,8 +104,8 @@ class MeanObservable(BaseObservable):
     def __init__(self, signal: Union[str, Iterable[str]], **kwargs: Any) -> None:
         super().__init__(signal=signal, **kwargs)
 
-    def compute(self, outputs: Dict[str, np.ndarray], params: Dict[str, Any] | None = None,
-                config: Dict[str, Any] | None = None) -> Dict[str, Any]:
+    def compute(self, outputs: Dict[str, np.ndarray], params: Optional[Dict[str, Any]] = None,
+                config: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
         res: Dict[str, Any] = {}
         for var in self.signal:
             ts = _get_ts(outputs, var)
@@ -129,8 +129,8 @@ class RawObservable(BaseObservable):
     def __init__(self, signal: Union[str, Iterable[str]] = ("bold",), **kwargs: Any) -> None:
         super().__init__(signal=signal, **kwargs)
 
-    def compute(self, outputs: Dict[str, np.ndarray], params: Dict[str, Any] | None = None,
-                config: Dict[str, Any] | None = None) -> Dict[str, Any]:
+    def compute(self, outputs: Dict[str, np.ndarray], params: Optional[Dict[str, Any]] = None,
+                config: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
         res: Dict[str, Any] = {}
         for var in self.signal:
             ts = _get_ts(outputs, var)
@@ -155,8 +155,8 @@ class FCDObservable(BaseObservable):
         self.window_size = int(window_size)
         self.overlap = int(overlap)
 
-    def compute(self, outputs: Dict[str, np.ndarray], params: Dict[str, Any] | None = None,
-                config: Dict[str, Any] | None = None) -> Dict[str, Any]:
+    def compute(self, outputs: Dict[str, np.ndarray], params: Optional[Dict[str, Any]] = None,
+                config: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
         res: Dict[str, Any] = {}
         for var in self.signal:
             ts = _get_ts(outputs, var)
@@ -169,6 +169,70 @@ class FCDObservable(BaseObservable):
             fcd = np.corrcoef(fcd.T)  # Correlate FC vectors over time windows
             res[f"fcd_{var}"] = fcd
         return res
+
+
+class FICNodeStrengthCorrelationObservable(BaseObservable):
+    """Find time index where FIC values have maximal correlation with structural node strength.
+
+    This observable computes the correlation between FIC values and structural connectivity 
+    node strength (row/column sums of the connectivity matrix) at each time point, then 
+    returns the time index where this correlation is maximal.
+    
+    The structural connectivity matrix is extracted from params['C'].
+    Input FIC time series are assumed (N, T) where N=regions, T=time points.
+    """
+
+    name = "fic_max_corr"
+
+    def __init__(self, signal: Union[str, Iterable[str]] = "fic", **kwargs: Any) -> None:
+        super().__init__(signal=signal, **kwargs)
+
+    def compute(self, outputs: Dict[str, np.ndarray], params: Optional[Dict[str, Any]] = None,
+                config: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+        res: Dict[str, Any] = {}
+        
+        if params is None:
+            return res
+            
+        # Extract structural connectivity matrix
+        sc_matrix = params.get('C')
+        if sc_matrix is None:
+            return res
+            
+        # Compute node strengths (sum of connections for each node)
+        node_strengths = np.sum(sc_matrix, axis=1)
+        
+        for var in self.signal:
+            ts = _get_ts(outputs, var)
+            if ts is None or ts.ndim != 2:
+                continue
+                
+            N, T = ts.shape
+            
+            # Check dimensions match
+            if N != len(node_strengths):
+                continue
+                
+            # Compute correlation at each time point
+            correlations = np.zeros(T)
+            for t in range(T):
+                fic_values = ts[:, t]
+                # Skip if all FIC values are the same (correlation undefined)
+                if np.std(fic_values) == 0 or np.std(node_strengths) == 0:
+                    correlations[t] = 0.0
+                else:
+                    correlations[t] = np.corrcoef(fic_values, node_strengths)[0, 1]
+            
+            # Find time index with maximum absolute correlation
+            max_corr_idx = np.argmax(np.abs(correlations))
+            max_correlation = correlations[max_corr_idx]
+            
+            res[f"fic_max_corr_time_{var}"] = max_corr_idx
+            res[f"fic_max_corr_value_{var}"] = max_correlation            
+            
+        return res
+
+
 # -----------------------------
 # Pipeline and factory
 # -----------------------------
@@ -178,6 +242,7 @@ _REGISTRY = {
     FCDObservable.name: FCDObservable,
     MeanObservable.name: MeanObservable,
     RawObservable.name: RawObservable,
+    FICNodeStrengthCorrelationObservable.name: FICNodeStrengthCorrelationObservable,
 }
 
 
@@ -187,8 +252,8 @@ class ObservablesPipeline:
     def __init__(self, extractors: Optional[List[BaseObservable]] = None) -> None:
         self.extractors: List[BaseObservable] = list(extractors or [])
 
-    def compute(self, outputs: Dict[str, np.ndarray], params: Dict[str, Any] | None = None,
-                config: Dict[str, Any] | None = None) -> Dict[str, Any]:
+    def compute(self, outputs: Dict[str, np.ndarray], params: Optional[Dict[str, Any]] = None,
+                config: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
         merged: Dict[str, Any] = {}
         for i, obs in enumerate(self.extractors):
             out = obs.compute(outputs, params, config) or {}
@@ -256,5 +321,6 @@ __all__ = [
     "FCDObservable",
     "MeanObservable",
     "RawObservable",
+    "FICNodeStrengthCorrelationObservable",
     "ObservablesPipeline",
 ]

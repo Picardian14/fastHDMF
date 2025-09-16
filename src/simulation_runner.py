@@ -12,7 +12,7 @@ import shutil
 from tqdm import tqdm
 from joblib import Parallel, delayed
 from itertools import product, islice
-from typing import Any, Dict, Tuple, Optional
+from typing import Any, Dict, Tuple, Optional, Union
 from collections import defaultdict
 
 # Add project paths
@@ -35,7 +35,7 @@ except ImportError:
 class HDMFSimulationRunner:
     """Runs HDMF simulations with experiment management"""
 
-    def __init__(self, project_root: Path, experiment_manager: ExperimentManager, observables: ObservablesPipeline | None = None):
+    def __init__(self, project_root: Path, experiment_manager: ExperimentManager, observables: Optional[ObservablesPipeline] = None):
         self.project_root = project_root
         self.experiment_manager = experiment_manager
         # Prefer pipeline from ExperimentManager; allow explicit override
@@ -52,6 +52,24 @@ class HDMFSimulationRunner:
             sc_root=self.experiment_manager.current_conf.get('data', {}).get('sc_root', 'SCs')
         )
         self.all_ipps = self.metadata['IPP'].tolist()        
+
+    def _generate_parameter_values(self, spec: dict) -> np.ndarray:
+        """Generate parameter values from spec with optional custom function"""
+        if "fun" in spec:
+            fun_name = spec["fun"]
+            args = spec.get("args", [])
+            kwargs = spec.get("kwargs", {})
+            
+            try:
+                func = eval(fun_name)
+                values = func(*args, **kwargs)
+                return np.array(values, dtype=float)
+            except Exception as e:
+                raise ValueError(f"Error calling function '{fun_name}': {e}")
+        else:
+            # Default: start, end, step
+            values = np.arange(spec["start"], spec["end"], spec["step"], dtype=float)
+            return np.round(values, 12)
 
     def _contiguous_block(self, total: int, parts: int, k: int) -> tuple[int, int]:
         base, rem = divmod(total, parts)
@@ -76,10 +94,8 @@ class HDMFSimulationRunner:
             return
 
         axis_names = list(grid.keys())
-        # End-exclusive axes, readable and robust to float error.
-        axis_values = [np.arange(spec["start"], spec["end"], spec["step"], dtype=float)
-                    for spec in grid.values()]
-        axis_values = [np.round(v, 12) for v in axis_values]
+        # Generate parameter values using the new utility function
+        axis_values = [self._generate_parameter_values(spec) for spec in grid.values()]
 
         self._axis_names = axis_names
         self._axis_values = axis_values
@@ -119,18 +135,22 @@ class HDMFSimulationRunner:
         params['nvc_u50']         = 12.0   # half-saturation (Hz): compression starts in this range
         params['nvc_match_slope'] = False # if using sigmoid, match slope at obj_rate
         params['nvc_k']          = 0.20    # maximum vasodilatory signal gain                    
-        # Load homeostatic parameters
-        fit_res_path = Path(__file__).parent.parent / "data" / "fit_res_3-44.npy"
-        fit_res = np.load(str(fit_res_path))
-        b = fit_res[0]
-        a = fit_res[1]
+        
         
         params["with_decay"] = task['with_decay']
         params["with_plasticity"] = task['with_plasticity']
     
         if 'lrj' in task:
             LR = task['lrj']
-            DECAY = np.exp(a + np.log(LR) * b) if task['with_decay'] else 0
+            if 'taoj' not in task:
+                # Load homeostatic parameters
+                fit_res_path = Path(__file__).parent.parent / "data" / "fit_res_3-44.npy"
+                fit_res = np.load(str(fit_res_path))
+                b = fit_res[0]
+                a = fit_res[1]
+                DECAY = np.exp(a + np.log(LR) * b) if task['with_decay'] else 0
+            else:
+                DECAY = task['taoj']
 
             # Makes decay and lr heterogenizable, as J is.
             params['taoj_vector'] = np.ones(params['N']) * DECAY
@@ -195,10 +215,7 @@ class HDMFSimulationRunner:
             else:
                 # Create parameter values to iterate over
                 range_config = over_config.get('range', {})
-                param_start = range_config.get('start')
-                param_end = range_config.get('end')
-                param_step = range_config.get('step')
-                param_values = np.arange(param_start, param_end, param_step)
+                param_values = self._generate_parameter_values(range_config)
 
                 # Cartesian product between patients and parameter values
                 for ipp, sc_matrix in sc_matrices.items():
@@ -279,7 +296,7 @@ class HDMFSimulationRunner:
 
         n_jobs = min(len(items), min(32, os.cpu_count() or 1))
         # --- Helpers ---
-        def _run_one(current_task: Dict[str, Any], i: int, ipp: str, item_value: Any) -> Tuple[str, Dict[str, Any] | None]:
+        def _run_one(current_task: Dict[str, Any], i: int, ipp: str, item_value: Any) -> Tuple[str, Optional[Dict[str, Any]]]:
             try:
                 # If there is a param to iterate over, set it here
                 thread_task = current_task.copy()  # capture current task from outer loop

@@ -9,7 +9,7 @@ import os
 import pickle
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, Any, Optional, Tuple
+from typing import Dict, Any, Optional, Tuple, List
 import pandas as pd
 import numpy as np
 import re
@@ -21,10 +21,10 @@ from src.observables import ObservablesPipeline
 class ExperimentManager:
     """Manages HDMF experiments with configuration, logging, and result storage"""
     
-    def __init__(self, project_root: Path):
+    def __init__(self, project_root: Path, results_dir: Optional[Path] = None):
         self.project_root = Path(project_root)
         self.configs_dir = self.project_root / "configs"
-        self.results_dir = self.project_root / "results"
+        self.results_dir = Path(results_dir) if results_dir else (self.project_root / "results")
         self.experiments_dir = self.results_dir / "experiments"
         
         # Create directories if they don't exist
@@ -39,7 +39,7 @@ class ExperimentManager:
         self.observables = None
         
     def integrate_slurm_results(self, experiment_id: str) -> Path:
-        base_dir = self.experiments_dir / experiment_id
+        base_dir = Path(self.experiments_dir) / experiment_id
         if not base_dir.exists() or not base_dir.is_dir():
             raise ValueError(f"Base experiment directory not found: {base_dir}")
 
@@ -167,7 +167,10 @@ class ExperimentManager:
             # Fallback to a safe default if config is malformed
             self.observables = ObservablesPipeline.default()
         # Determine experiment ID strictly from the config filename (stem)
-        cfg_path = Path(self.current_config_path) if self.current_config_path else Path(config_path)
+        if self.current_config_path:
+            cfg_path = Path(self.current_config_path)
+        else:
+            cfg_path = Path(config_path)
         experiment_id = cfg_path.stem
 
         # Determine if we will save anything; only then create directories
@@ -176,7 +179,7 @@ class ExperimentManager:
 
         self.experiment_dir = None
         if will_save:
-            self.experiment_dir = self.experiments_dir / experiment_id
+            self.experiment_dir = Path(self.experiments_dir) / experiment_id
             self.experiment_dir.mkdir(parents=True, exist_ok=True)
         # New directory layout for SLURM array jobs:
         #   Base experiment folder: <experiment_name>_<timestamp>
@@ -188,7 +191,7 @@ class ExperimentManager:
             self.job_id = int(job_id)
             self.job_count = int(job_count_str) if job_count_str is not None else None
 
-            base_dir = self.experiments_dir / experiment_id
+            base_dir = Path(self.experiments_dir) / experiment_id
             base_dir.mkdir(parents=True, exist_ok=True)
 
             job_folder = base_dir / f"job_{job_id}"
@@ -262,7 +265,7 @@ class ExperimentManager:
         else:
             print(f"INFO: {message}")
     
-    def save_results(self, results: Dict[str, Any], config: Dict[str, Any], failed_simulations: list = None):
+    def save_results(self, results: Dict[str, Any], config: Dict[str, Any], failed_simulations: Optional[List] = None):
         """Save experiment results"""
         out = (config or {}).get('output', {})
         will_save = bool(out.get('save_full_outputs') or out.get('save_metrics_only') or out.get('save_plots'))
@@ -273,7 +276,7 @@ class ExperimentManager:
         if not self.experiment_dir:
             # Create directory on-demand if missing (should not happen if setup_experiment followed flags)
             exp_id = (self.current_config_path and Path(self.current_config_path).stem) or datetime.now().strftime("%Y%m%d_%H%M%S")
-            self.experiment_dir = self.experiments_dir / exp_id
+            self.experiment_dir = Path(self.experiments_dir) / exp_id
             self.experiment_dir.mkdir(parents=True, exist_ok=True)
             # Ensure logging to file is enabled now
             self._setup_logging(exp_id)
@@ -344,7 +347,7 @@ class ExperimentManager:
 
     def load_experiment_results(self, experiment_id: str, is_done: bool) -> Dict[str, Any]:
         """Load results from a completed experiment. As with setup_experiment it sets the current results directory"""
-        self.experiment_dir = self.experiments_dir / experiment_id if not is_done else self.experiments_dir / "done" / experiment_id
+        self.experiment_dir = Path(self.experiments_dir) / experiment_id if not is_done else Path(self.experiments_dir) / "done" / experiment_id
 
         if not self.experiment_dir.exists():
             raise FileNotFoundError(f"Experiment directory not found: {self.experiment_dir}")

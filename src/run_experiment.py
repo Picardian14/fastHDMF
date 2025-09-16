@@ -18,6 +18,8 @@ def main():
     parser = argparse.ArgumentParser(description='Run HDMF experiment from config file')
     parser.add_argument('config', help='Config file name (e.g., "default_hdmf" or "experiments/high_coupling")')
     parser.add_argument('--id', help='Custom experiment ID (optional)', default=None)
+    parser.add_argument('--job-id', help='SLURM array job ID', type=int, default=None)
+    parser.add_argument('--job-count', help='Total number of SLURM array jobs', type=int, default=None)
     parser.add_argument('--list-configs', action='store_true', help='List available config files')
     print(project_root)
     args = parser.parse_args()
@@ -38,17 +40,26 @@ def main():
     
     print(f"Running experiment with config: {args.config}")
     if args.id:
-        print(f"Using custom experiment ID: {args.id}")    
+        print(f"Using custom experiment ID: {args.id}")
+    if args.job_id is not None:
+        print(f"SLURM array job ID: {args.job_id}")
+    if args.job_count is not None:
+        print(f"Total SLURM jobs: {args.job_count}")
+        
     try:
-        experiment_manager = ExperimentManager(project_root)
+        experiment_manager = ExperimentManager(project_root, results_dir="/network/iss/cohen/data/Ivan/fastHDMF/")
+        
+        # Use command line args if provided, otherwise fall back to environment variables
+        job_id = args.job_id if args.job_id is not None else os.getenv('SLURM_ARRAY_TASK_ID')
+        job_count = args.job_count if args.job_count is not None else os.getenv('SLURM_ARRAY_TASK_COUNT')
+        
         experiment_dir, experiment_id = experiment_manager.setup_experiment(
-            config_path=args.config, experiment_id=args.id,
-            job_id=os.getenv('SLURM_ARRAY_TASK_ID'), job_count_str=os.getenv('SLURM_ARRAY_TASK_COUNT')
+            config_path=args.config, job_id=job_id, job_count_str=job_count
         )
 
         # ExperimentManager now stores the ObservablesPipeline; runner will consume it.
         runner = HDMFSimulationRunner(project_root, experiment_manager)
-        runner.run_experiment(experiment_id)
+        runner.run_experiment()
         print(f"\n✅ Experiment completed successfully!")
         print(f"Experiment ID: {experiment_id}")
         print(f"Results directory: {experiment_dir}")
