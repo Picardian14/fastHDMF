@@ -48,8 +48,8 @@ class HDMFSimulationRunner:
 
         # Load patient data once
         self.metadata = load_metadata(
-            metadata_file=self.experiment_manager.current_conf.get('data', {}).get('metadata', None),
-            sc_root=self.experiment_manager.current_conf.get('data', {}).get('sc_root', 'SCs')
+            metadata_file=self.experiment_manager.current_config.get('data', {}).get('metadata', None),
+            sc_root=self.experiment_manager.current_config.get('data', {}).get('sc_root', 'SCs')
         )
         self.all_ipps = self.metadata['IPP'].tolist()        
 
@@ -255,7 +255,7 @@ class HDMFSimulationRunner:
         """
         em = self.experiment_manager
         log = em.logger
-        config = em.current_conf
+        config = em.current_config
         sim = config.get("simulation", {})
         nb_steps = int(sim.get("nb_steps", 1000))
         parallel = bool(sim.get("parallel", False))

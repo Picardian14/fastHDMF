@@ -4,7 +4,7 @@ import warnings
 
 import numpy as np
 import matplotlib.pyplot as plt
-
+from src.experiment_manager import ExperimentManager
 try:
     from utils.plotting import ResultsPlotter
 except ImportError as e:
@@ -30,15 +30,15 @@ class HDMFResultsPlotter(ResultsPlotter):
     """
     def __init__(
         self,
-        config: Optional[dict] = None,
-        config_path: Optional[Union[str, Path]] = None,
+        experiment_manager: ExperimentManager,        
         style_config: Optional[dict] = None,
         style_config_path: Optional[Union[str, Path]] = None,
     ):
         # Initialize with plotting style and experiment configurations
-        super().__init__(
-            config=config,
-            config_path=config_path,
+        self.experiment_manager = experiment_manager
+        super().__init__(            
+            config=experiment_manager.current_config,
+            config_path=experiment_manager.current_config_path,
             style_config=style_config,
             style_config_path=style_config_path,
         )

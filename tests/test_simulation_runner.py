@@ -31,7 +31,7 @@ class DummyLogger:
 
 class DummyExperimentManager:
     def __init__(self, config, experiment_dir, job_id=None, job_count=None):
-        self.current_conf = config
+        self.current_config = config
         self.experiment_dir = str(experiment_dir)
         self.logger = DummyLogger()
         self.job_id = job_id

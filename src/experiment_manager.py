@@ -32,7 +32,7 @@ class ExperimentManager:
         self.current_experiment = None
         self.experiment_dir = None
         self.logger = None
-        self.current_conf = None
+        self.current_config = None
         self.current_config_path: Optional[str] = None
         self.observables = None
         
@@ -164,11 +164,12 @@ class ExperimentManager:
     def setup_experiment(self, config_path: str, job_id: Optional[str] = None, job_count_str: Optional[str] = None) -> Tuple[Optional[Path], str]:
         """Setup a new experiment with logging and result directories.           
         """
-        config = self.load_config(config_path)
-        self.current_conf = config    
+        self.current_config = self.load_config(config_path)
+        # Extract the name of the file as the name of the experiment
+        self.experiment_id = config_path.stem if isinstance(config_path, Path) else Path(config_path).stem            
         # Build and store the observables pipeline for this experiment
         try:
-            self.observables = ObservablesPipeline.from_config(config.get("output", {}))
+            self.observables = ObservablesPipeline.from_config(self.current_config.get("output", {}))
         except Exception:
             # Fallback to a safe default if config is malformed
             self.observables = ObservablesPipeline.default()
@@ -176,46 +177,44 @@ class ExperimentManager:
         if self.current_config_path:
             cfg_path = Path(self.current_config_path)
         else:
-            cfg_path = Path(config_path)
-        experiment_id = cfg_path.stem
+            cfg_path = Path(config_path)         
 
         # Determine if we will save anything; only then create directories
-        out = (self.current_conf or {}).get('output', {})
+        out = (self.current_config or {}).get('output', {})
         will_save = bool(out.get('save_full_outputs') or out.get('save_metrics_only') or out.get('save_plots'))
 
         self.experiment_dir = None
         if will_save:
-            self.experiment_dir = Path(self.results_dir) / experiment_id
+            self.experiment_dir = Path(self.results_dir) / self.experiment_id
             self.experiment_dir.mkdir(parents=True, exist_ok=True)
-        # New directory layout for SLURM array jobs:
-        #   Base experiment folder: <experiment_name>_<timestamp>
+        # New directory layout for SLURM array jobs:        
         #   Each job has subfolder: job_<id>
         # Single (non-array) runs keep old flat structure.
         if job_id is not None and will_save:
-            #base_experiment_id = f"{experiment_id}_{timestamp}"
-            self.base_experiment_id = experiment_id  # informational
+            #base_experiment_id = f"{self.experiment_id}_{timestamp}"
+            self.base_experiment_id = self.experiment_id  # informational
             self.job_id = int(job_id)
             self.job_count = int(job_count_str) if job_count_str is not None else None
 
-            base_dir = Path(self.results_dir) / experiment_id
+            base_dir = Path(self.results_dir) / self.experiment_id
             base_dir.mkdir(parents=True, exist_ok=True)
 
             job_folder = base_dir / f"job_{job_id}"
             job_folder.mkdir(parents=True, exist_ok=True)
             self.experiment_dir = job_folder
 
-            # Maintain full experiment_id with job suffix for metadata/logging
-            self.experiment_id = f"{experiment_id}_job{job_id}"
+            # Maintain full self.experiment_id with job suffix for metadata/logging
+            self.experiment_id = f"{self.experiment_id}_job{job_id}"
 
         # Setup logging (console-only if not saving)
-        self._setup_logging(experiment_id)
+        self._setup_logging(self.experiment_id)
 
     
         metadata = {
-            'experiment_id': experiment_id,
+            'experiment_id': self.experiment_id,
             'original_config_path': self.current_config_path or str(config_path),
             'start_time': datetime.now().isoformat(),
-            'config': self.current_conf,
+            'config': self.current_config,
             'status': 'initialized',
             'observables_spec': self.observables.spec() if self.observables else []
         }
@@ -225,9 +224,9 @@ class ExperimentManager:
             with open(metadata_path, 'w') as f:
                 json.dump(metadata, f, indent=2)
         
-        self.current_experiment = experiment_id
-        self.logger.info(f"Experiment '{experiment_id}' initialized")
-        desc = (config.get('experiment') or {}).get('description')
+        self.current_experiment = self.experiment_id
+        self.logger.info(f"Experiment '{self.experiment_id}' initialized")
+        desc = (self.current_config.get('experiment') or {}).get('description')
         if desc:
             self.logger.info(f"Config: {desc}")
         if self.experiment_dir is not None:
@@ -235,7 +234,7 @@ class ExperimentManager:
         else:
             self.logger.info("No save flags set; results will not be written to disk.")
 
-        return self.experiment_dir, experiment_id
+        return self.experiment_dir, self.experiment_id
     
     def _setup_logging(self, experiment_id: str):
         """Setup logging for the experiment. If no experiment_dir (not saving), use console-only."""
@@ -351,9 +350,8 @@ class ExperimentManager:
         
         return pd.DataFrame(experiments)
 
-    def load_experiment_results(self, experiment_id: str, is_done: bool) -> Dict[str, Any]:
-        """Load results from a completed experiment. As with setup_experiment it sets the current results directory"""
-        self.experiment_dir = Path(self.results_dir) / experiment_id if not is_done else Path(self.results_dir) / "done" / experiment_id
+    def load_experiment_results(self) -> Dict[str, Any]:
+        """Load results from a completed experiment. As with setup_experiment it sets the current results directory"""        
 
         if not self.experiment_dir.exists():
             raise FileNotFoundError(f"Experiment directory not found: {self.experiment_dir}")
@@ -367,10 +365,10 @@ class ExperimentManager:
                 results['metadata'] = json.load(f)
         # Load configuration from the original YAML file rather than from metadata JSON
         original_config_path = results['metadata'].get('original_config_path')        
-        self.current_conf = self.load_config(original_config_path)
+        self.current_config = self.load_config(original_config_path)
         # Rebuild observables pipeline for any follow-up processing
         try:
-            self.observables = ObservablesPipeline.from_config(self.current_conf.get("output", {}))
+            self.observables = ObservablesPipeline.from_config(self.current_config.get("output", {}))
         except Exception:
             self.observables = ObservablesPipeline.default()
         
