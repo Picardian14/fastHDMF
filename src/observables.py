@@ -233,6 +233,66 @@ class FICNodeStrengthCorrelationObservable(BaseObservable):
         return res
 
 
+class MaxFreqPowerObservable(BaseObservable):
+    """Compute maximum frequency and its power for each region using Welch PSD.
+
+    Returns keys: `max_freqs_<var>`, `max_power_<var>`, and also includes the full
+    `freqs_<var>` and `psd_<var>` if `params.get('return_psd', False)`.
+
+    Default parameters (can be overridden via params):
+    - fs: sampling frequency (default 1000)
+    - nperseg: number of samples per segment (default 4000)
+    - noverlap: overlap between segments (default 2000)
+    - max_freq_cut: upper index (or frequency) limit when searching for max (default: first 100 bins)
+    """
+
+    name = "max_freq_power"
+
+    def __init__(self, signal: Union[str, Iterable[str]] = "rates", **kwargs: Any) -> None:
+        super().__init__(signal=signal, **kwargs)
+
+    def compute(self, outputs: Dict[str, np.ndarray], params: Optional[Dict[str, Any]] = None,
+                config: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+        res: Dict[str, Any] = {}
+        p = dict(fs=1000, nperseg=4 * 1000, noverlap=2 * 1000, max_freq_cut=100, return_psd=False)
+        if params:
+            p.update(params)
+
+        for var in self.signal:
+            ts = _get_ts(outputs, var)
+            if ts is None or ts.ndim != 2:
+                continue
+            # Expect (N, T): compute Welch along time axis=1 for each region (axis=1 -> axis=1 in welch when axis=1)
+            # Import scipy.signal.welch locally so this module can be imported even when scipy isn't installed.
+            try:
+                from scipy.signal import welch
+            except Exception:
+                # If scipy not available, skip this observable silently.
+                continue
+            freqs, psd = welch(ts, fs=p["fs"], axis=1, nperseg=p["nperseg"], noverlap=p["noverlap"]) 
+            # psd shape (N, F)
+            # Determine index/limit to search for max: if max_freq_cut is int -> interpret as number of bins
+            max_cut = p["max_freq_cut"]
+            if isinstance(max_cut, (int,)):
+                idx_cut = min(max_cut, psd.shape[1])
+            else:
+                # if provided frequency value, find nearest index
+                idx_cut = np.searchsorted(freqs, float(max_cut))
+                idx_cut = min(max(1, idx_cut), psd.shape[1])
+
+            max_freq_id = np.argmax(psd[:, :idx_cut], axis=1)
+            max_freqs = freqs[max_freq_id]
+            max_power = np.max(psd[:, :idx_cut], axis=1)
+
+            res[f"max_freqs_{var}"] = max_freqs
+            res[f"max_power_{var}"] = max_power
+            if p.get("return_psd"):
+                res[f"freqs_{var}"] = freqs
+                res[f"psd_{var}"] = psd
+
+        return res
+
+
 # -----------------------------
 # Pipeline and factory
 # -----------------------------
@@ -243,6 +303,7 @@ _REGISTRY = {
     MeanObservable.name: MeanObservable,
     RawObservable.name: RawObservable,
     FICNodeStrengthCorrelationObservable.name: FICNodeStrengthCorrelationObservable,
+    MaxFreqPowerObservable.name: MaxFreqPowerObservable,
 }
 
 
@@ -322,5 +383,6 @@ __all__ = [
     "MeanObservable",
     "RawObservable",
     "FICNodeStrengthCorrelationObservable",
+    "MaxFreqPowerObservable",
     "ObservablesPipeline",
 ]
