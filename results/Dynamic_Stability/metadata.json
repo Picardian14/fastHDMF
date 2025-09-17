@@ -1,0 +1,76 @@
+{
+  "experiment_id": "Dynamic_Stability",
+  "original_config_path": "/network/iss/home/ivan.mindlin/Repos/fastHDMF/configs/experiments/Dynamic_Stability.yaml",
+  "start_time": "2025-09-17T15:53:38.536341",
+  "config": {
+    "simulation": {
+      "nb_steps": 50000,
+      "obj_rate": 3.44,
+      "with_decay": true,
+      "with_plasticity": true,
+      "TR": 2.4,
+      "burnout": 8,
+      "lrj": 1.32,
+      "over": {
+        "seed": {
+          "fun": "np.arange",
+          "args": [
+            1,
+            31,
+            1
+          ]
+        }
+      },
+      "parallel": true
+    },
+    "grid": {
+      "G": {
+        "fun": "np.arange",
+        "args": [
+          0.1,
+          8.1,
+          0.1
+        ]
+      }
+    },
+    "data": {
+      "test_mode": false,
+      "max_subjects_test": 1,
+      "sc_root": "AAL"
+    },
+    "output": {
+      "save_full_outputs": true,
+      "observables": [
+        {
+          "name": "mean",
+          "signal": "rates"
+        },
+        {
+          "name": "mean",
+          "signal": "fic"
+        }
+      ]
+    },
+    "experiment": {
+      "description": "Showing firing rate stability across G values in the dynamic model",
+      "version": "1.1"
+    }
+  },
+  "status": "initialized",
+  "observables_spec": [
+    {
+      "name": "mean",
+      "signal": [
+        "rates"
+      ],
+      "params": {}
+    },
+    {
+      "name": "mean",
+      "signal": [
+        "fic"
+      ],
+      "params": {}
+    }
+  ]
+}

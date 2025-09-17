@@ -3,7 +3,7 @@ import os
 eigen_path = os.path.abspath('cpp/Eigen')
 
 ext = Extension('_DYN_FIC_DMF',
-                libraries = ['boost_python310', 'boost_numpy310'],
+                libraries = ['boost_python38', 'boost_numpy38'],
                 sources   = ['fastdyn_fic_dmf/DYN_FIC_DMF.cpp'])
 
 setup(name              = 'fastdyn_fic_dmf',

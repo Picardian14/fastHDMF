@@ -145,10 +145,12 @@ class HDMFSimulationRunner:
             if 'taoj' not in task:
                 # Load homeostatic parameters
                 fit_res_path = Path(__file__).parent.parent / "data" / "fit_res_3-44.npy"
+                self.experiment_manager.logger.info(f"Loading homeostatic fit results from {fit_res_path}")
                 fit_res = np.load(str(fit_res_path))
                 b = fit_res[0]
                 a = fit_res[1]
                 DECAY = np.exp(a + np.log(LR) * b) if task['with_decay'] else 0
+                self.experiment_manager.logger.info(f"Setting homeostatic DECAY={DECAY:.5f} for LR={LR:.5f}")
             else:
                 DECAY = task['taoj']
 

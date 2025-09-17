@@ -16,12 +16,12 @@ import re
 import psutil
 
 from src.observables import ObservablesPipeline
-
+from utils.calculate_grid_size import get_grid_size
 
 class ExperimentManager:
     """Manages HDMF experiments with configuration, logging, and result storage"""
     
-    def __init__(self, project_root: Path, config_path: Optional[str] = None, results_dir: Optional[Path] = None, job_id: Optional[int] = None, job_count: Optional[int] = None):
+    def __init__(self, project_root: Path, config_path: str, results_dir: Optional[Path] = None, job_id: Optional[int] = None, job_count: Optional[int] = None):
         self.project_root = Path(project_root)
         self.configs_dir = self.project_root / "configs"
         # unified results directory
@@ -33,7 +33,7 @@ class ExperimentManager:
         self.experiment_dir = None
         self.logger = None
         self.current_config = None
-        self.current_config_path: Optional[str] = None
+        self.current_config_path = config_path
         self.observables = None
         
         # if config_path provided, immediately set up experiment
@@ -44,8 +44,8 @@ class ExperimentManager:
                 job_count_str=str(job_count) if job_count is not None else None
             )
     
-    def integrate_slurm_results(self, experiment_id: str) -> Path:
-        base_dir = self.results_dir / experiment_id
+    def integrate_slurm_results(self) -> Path:
+        base_dir = self.experiment_dir
         if not base_dir.exists() or not base_dir.is_dir():
             raise ValueError(f"Base experiment directory not found: {base_dir}")
 
@@ -58,7 +58,7 @@ class ExperimentManager:
 
         # Logging
         self.experiment_dir = base_dir
-        self._setup_logging(experiment_id)
+        self._setup_logging(self.experiment_id)
         self.logger.info(f"Integrating {len(job_folders)} job folders from {base_dir}")
 
         merged = None
@@ -87,7 +87,7 @@ class ExperimentManager:
                 if k in tgt_obs and getattr(tgt_obs[k], 'size', 0) > 0 and getattr(src, 'size', 0) > 0:
                     tgt_obs[k] = np.concatenate([tgt_obs[k], src], axis=0)
                 elif getattr(src, 'size', 0) > 0:
-                    tgt_obs[k] = src
+                    tgt_obs[k] = src                        
             merged['observables'] = tgt_obs
 
             # Patients should be identical across jobs; keep the first
@@ -96,7 +96,9 @@ class ExperimentManager:
             # Update simple counters
             m = merged.setdefault('meta', {})
             m['num_tasks_integrated'] = m.get('num_tasks_integrated', 0) + jr.get('meta', {}).get('local_task_count', 0)
-
+        _, grid_shape = get_grid_size(self.current_config_path,verbose=False)
+        for k in merged['observables']:
+            merged['observables'][k] = np.reshape(merged['observables'][k], grid_shape)
         # Finalize metadata
         merged = merged or {}
         merged.setdefault('meta', {})
@@ -114,13 +116,16 @@ class ExperimentManager:
         # Update / write metadata.json at base level
         meta_path = base_dir / "metadata.json"
         base_meta = {
-            'experiment_id': experiment_id,
+            'experiment_id': self.experiment_id,
             'status': 'completed',
             'end_time': datetime.now().isoformat(),
             'total_patients': len(merged.get('patients', [])),
             'integrated_from_jobs': len(job_folders),
             'original_job_folders': [d.name for d in job_folders],
             'failed_simulations': merged.get('failed_simulations', []),
+            'observables_spec': self.observables.spec() if self.observables else [],
+            'original_config_path': self.current_config_path,
+            'config': self.current_config,
         }
         with open(meta_path, 'w') as f:
             json.dump(base_meta, f, indent=2)
@@ -173,11 +178,7 @@ class ExperimentManager:
         except Exception:
             # Fallback to a safe default if config is malformed
             self.observables = ObservablesPipeline.default()
-        # Determine experiment ID strictly from the config filename (stem)
-        if self.current_config_path:
-            cfg_path = Path(self.current_config_path)
-        else:
-            cfg_path = Path(config_path)         
+             
 
         # Determine if we will save anything; only then create directories
         out = (self.current_config or {}).get('output', {})

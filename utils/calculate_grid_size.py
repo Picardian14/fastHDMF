@@ -8,7 +8,7 @@ import numpy as np
 from pathlib import Path
 DATAPATH = Path(__file__).parent.parent / "data" / "raw"
 
-def calculate_grid_size(config_path):
+def get_grid_size(config_path,verbose=True):
     """Calculate total grid size from config file"""
     with open(config_path, 'r') as f:
         config = yaml.safe_load(f)
@@ -18,7 +18,7 @@ def calculate_grid_size(config_path):
         return 1
     
     total_combinations = 1
-    
+    all_values = []
     for param_name, spec in grid.items():
         if "fun" in spec:
             # Custom function - need to evaluate to get size
@@ -42,19 +42,23 @@ def calculate_grid_size(config_path):
             param_size = len(values)
         
         total_combinations *= param_size
-        print(f"{param_name}: {param_size} values")
+        if verbose:
+            print(f"{param_name}: {param_size} values")
         # print actual values for sanity check
         try:
             val_list = values.tolist()
         except Exception:
             val_list = list(values)
-        print(f"  values: {val_list}")
+        if verbose:
+            print(f"  values: {val_list}")
+        all_values.append(val_list)
     
     # Handle optional "over" parameters (e.g., SC matrices selection)
     sim = config.get("simulation", {})
     over = sim.get("over", {}) or config.get("over", {})
     if over:
-        print("\nOver parameters:")
+        if verbose:
+            print("\nOver parameters:")
         total_over = 1
         for param_name, spec in over.items():
             if "fun" in spec:
@@ -64,7 +68,7 @@ def calculate_grid_size(config_path):
                 try:
                     func = eval(fun_name)
                     values = func(*args, **kwargs)
-                except Exception as e:
+                except Exception as e:                    
                     print(f"Error evaluating {fun_name}: {e}")
                     return None
             else:
@@ -74,13 +78,16 @@ def calculate_grid_size(config_path):
                 values = np.arange(start, end, step)
             over_size = len(values)
             total_over *= over_size
-            print(f"{param_name}: {over_size} values")
+            if verbose:
+                print(f"{param_name}: {over_size} values")
             try:
                 over_list = values.tolist()
             except Exception:
                 over_list = list(values)
-            print(f"  values: {over_list}")
-        print(f"\nTotal over combinations: {total_over}")
+            if verbose:
+                print(f"  values: {over_list}")
+        if verbose:
+            print(f"\nTotal over combinations: {total_over}")
         # Count SC matrices in specified sc_root
         data_cfg = config.get("data", {})
         sc_root = data_cfg.get("sc_root", "SCs")
@@ -90,10 +97,12 @@ def calculate_grid_size(config_path):
             sc_count = len(sc_files)
         else:
             sc_count = 0
-        print(f"SC matrices found in '{sc_root}': {sc_count}")
+        if verbose:
+            print(f"SC matrices found in '{sc_root}': {sc_count}")
         # Compute items per task (SC matrices × over values)
         items_per_task = total_over * sc_count
-        print(f"Items per task (SC matrices × over values): {items_per_task}")
+        if verbose:
+            print(f"Items per task (SC matrices × over values): {items_per_task}")
     else:
         # No over parameters: count SC matrices only
         data_cfg = config.get("data", {})
@@ -104,10 +113,13 @@ def calculate_grid_size(config_path):
             sc_count = len(sc_files)
         else:
             sc_count = 0
-        print(f"SC matrices found in '{sc_root}': {sc_count}")
+        if verbose:
+            print(f"SC matrices found in '{sc_root}': {sc_count}")
         items_per_task = sc_count
-        print(f"Items per task (SC matrices): {items_per_task}")
-    return total_combinations
+        if verbose:
+            print(f"Items per task (SC matrices): {items_per_task}")
+    grid_shape = [len(v) for v in all_values] + [items_per_task]
+    return total_combinations,grid_shape
 
 def suggest_array_size(grid_size, max_jobs=None):
     """Suggest optimal array size based on grid size"""
@@ -136,9 +148,9 @@ if __name__ == "__main__":
     if not Path(config_path).exists():
         print(f"Config file not found: {config_path}")
         sys.exit(1)
-    
-    grid_size = calculate_grid_size(config_path)
-    
+
+    grid_size, grid_shape = get_grid_size(config_path)
+
     if grid_size is None:
         print("Error calculating grid size")
         sys.exit(1)
@@ -148,3 +160,4 @@ if __name__ == "__main__":
     suggested = suggest_array_size(grid_size)
     print(f"Suggested SLURM array size: {suggested}")
     print(f"Tasks per job: {grid_size // suggested} (remainder: {grid_size % suggested})")
+    

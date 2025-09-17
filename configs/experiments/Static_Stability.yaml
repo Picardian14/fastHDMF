@@ -2,11 +2,11 @@
 simulation:
   nb_steps: 50000  # Shorter for testing
   obj_rate: 3.44
-  with_decay: true
-  with_plasticity: true  
+  with_decay: false
+  with_plasticity: false  
   TR: 2.4
   burnout: 8
-  lrj: 1.32
+  alpha: 0.75
   over:     
     # Alternative using custom function:
     seed: 
@@ -30,9 +30,8 @@ output:
       signal: rates
     - name: mean
       signal: fic
-    
       
   
 experiment:
-  description: "Showing firing rate stability across G values in the dynamic model"
-  version: "1.1"
+  description: "Showing firing rate stability across G values in the static model"
+  version: "1.0"
