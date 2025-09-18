@@ -97,8 +97,16 @@ class ExperimentManager:
             m = merged.setdefault('meta', {})
             m['num_tasks_integrated'] = m.get('num_tasks_integrated', 0) + jr.get('meta', {}).get('local_task_count', 0)
         _, grid_shape = get_grid_size(self.current_config_path,verbose=False)
-        for k in merged['observables']:
-            merged['observables'][k] = np.reshape(merged['observables'][k], grid_shape)
+        # Determine element shape per observable and reshape into full grid shape        
+        for k, data in merged['observables'].items():
+            # extract element shape (all dims after the first axis)
+            element_shape = data.flatten()[0].shape            
+            # combine grid dimensions with element dimensions
+            full_shape = tuple(grid_shape) + element_shape
+            merged['observables'][k] = np.stack(data.flatten()).reshape(full_shape)
+
+        # store element shapes in metadata for reference
+        
         # Finalize metadata
         merged = merged or {}
         merged.setdefault('meta', {})

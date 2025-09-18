@@ -166,8 +166,11 @@ class HDMFSimulationRunner:
         else:
             params['alpha'] = 0.75
             params['J'] = params['alpha'] * params['G'] * params['C'].sum(axis=0).squeeze() + 1
-        if 'J_file' in task: # Only for mixed cases where you want to load a prespecified FIC vector
-            J = np.load(task['J_file'])
+        if 'mixed' in task: # Only for mixed cases where you want to load a prespecified FIC vector
+            self.experiment_manager.logger.info("Loading FIC vector for mixed stability task")
+            G_value = f"{params['G']:.2f}".replace('.', '')
+            fname = project_root / "data" / "dyn_fics"  / f"mean_fic_G_{G_value}.npy"            
+            J = np.load(fname)
             params['J'] = J
         params['TR'] = task['TR']
         
