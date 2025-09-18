@@ -163,6 +163,9 @@ class HDMFSimulationRunner:
         if 'alpha' in task:
             params['alpha'] = task['alpha']
             params['J'] = params['alpha'] * params['G'] * params['C'].sum(axis=0).squeeze() + 1
+        else:
+            params['alpha'] = 0.75
+            params['J'] = params['alpha'] * params['G'] * params['C'].sum(axis=0).squeeze() + 1
         if 'J_file' in task: # Only for mixed cases where you want to load a prespecified FIC vector
             J = np.load(task['J_file'])
             params['J'] = J
