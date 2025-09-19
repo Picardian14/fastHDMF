@@ -1,3 +1,4 @@
+% DEPRECATED: Use run_fit('parcellation','HCP','dataset','awake','fit_mode','dyn_both') instead.
 try
     clear all;
     close all;
@@ -20,7 +21,8 @@ try
     params = dyn_fic_DefaultParams('C',C);
     % Fitting params
     params.fit_fc = false;
-    params.fit_fcd = true;
+    params.fit_fcd = false;
+    params.fit_both = true;
     % type of fic calculation
     params.with_plasticity=true;
     params.with_decay=true;

@@ -67,28 +67,17 @@ function [results] = dynamic_fitting(G, lr,dmf_pars,opts, observable)
         if isempty(sim_fcd)                    
             sim_fcd = zeros(size(sim_fcd));
             return
-        end
-    
-            
         
+        [~,~,ks] = kstest2(sim_fcd(:),observable(:));
+                    
         if thispars.fit_fc            
             out_error = 1 - corr(sim_fc(isubfc), observable(isubfc));
-        try
-            [~,~,ks] = kstest2(sim_fcd(:),observable(:));
-        catch 
-            disp("G: "+ thispars.G);
-            disp("LR: "+ thispars.lrj);
-            if isempty(sim_fcd)                    
-                disp("FCD Was empty ");
-            end
-            out_error=1;
-        end
         elseif thispars.fit_fcd                               
             out_error = ks; % we want to minimize the distance between distributions
         elseif thispars.fit_both
             out_error = 0.5*(1 - corr(sim_fc(isubfc), observable(isubfc))) + 0.5*ks; % we want to minimize the distance between distributions            
         end        
-        else
+        
             disp('error: target observable not set')
             out_error=nan;      
         end        

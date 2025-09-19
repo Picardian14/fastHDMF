@@ -1,3 +1,5 @@
+% DEPRECATED: Use run_fit('parcellation','AAL','dataset','coma24','fit_mode','dyn_fc') instead.
+% This script kept temporarily for backward compatibility.
 try 
     clear all;
     close all;

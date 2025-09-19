@@ -1,3 +1,4 @@
+% DEPRECATED: Use run_fit('parcellation','AAL','dataset','coma24','fit_mode','dyn_fcd') instead.
 try
 
     clear all;
