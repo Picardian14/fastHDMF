@@ -2,13 +2,13 @@
 
 addpath ../data ../dynamic_fic_dmf_Cpp
 % Load connectivity matrix and set parameters
-load('../data/DTI_fiber_consensus_HCP.mat', 'connectivity'); 
-C = connectivity(1:200, 1:200);
-C = 0.2 * C / max(C(:));
+load data/ts_coma24_AAL_symm_withSC.mat
+C = SC;
+C = 0.2.*C./max(C(:));
 N = size(C, 1);
 params = dyn_fic_DefaultParams('C',C);
 params.C = C;
-
+params.TR = 2.4;
 % Homeostatic parameters depend on the objective rate
 params.obj_rate = 3.44;
 % Pre-computed a,b coefficients for objective rate 3.44
@@ -23,7 +23,7 @@ end
 % To explore the effect of the decay set these as desired
 params.with_decay = true;
 params.with_plasticity = true;
-LR = 10;
+LR = 1.13;
 % Calculate the decay using the a,b coefficients
 DECAY = exp(a + log(LR) * b);
 % Set heterogeneous vectors or scalars
@@ -31,13 +31,13 @@ params.taoj_vector = ones(N,1) * DECAY;
 params.lr_vector = ones(N,1) * LR;
 
 % Set the global coupling strength
-G_VAL = 2.1;
+G_VAL = 2.9;
 params.G = G_VAL;
 % Initialize FIC values using the linear solution from fastDMF paper
 params.J = 0.75 * params.G * sum(params.C, 1)' + 1; 
 
 % Short simulation
-nb_steps = 50000;
+nb_steps = 400000;
 params.seed = 1;
 
 % Assume you want everything returned
