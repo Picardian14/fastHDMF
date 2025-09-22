@@ -5,6 +5,8 @@ simulation:
   with_decay: true
   with_plasticity: true  
   TR: 2.4
+  flp: 0.01
+  fhp: 0.1
   burnout: 8
   over: 
     #param_name: sc_matrix  # or 'param'

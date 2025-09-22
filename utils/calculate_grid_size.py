@@ -100,7 +100,11 @@ def get_grid_size(config_path,verbose=True):
         if verbose:
             print(f"SC matrices found in '{sc_root}': {sc_count}")
         # Compute items per task (SC matrices × over values)
-        items_per_task = total_over * sc_count
+        if config.get("simulation", {}).get("averaged", False):
+            # If averaged, each SC matrix is a separate task
+            items_per_task = sc_count
+        else:
+            items_per_task = total_over * sc_count
         if verbose:
             print(f"Items per task (SC matrices × over values): {items_per_task}")
     else:

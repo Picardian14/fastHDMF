@@ -1,6 +1,6 @@
 # Test parameter sweep - minimal example
 simulation:
-  nb_steps: 50000  # Shorter for testing
+  nb_steps: 800000  # Shorter for testing
   obj_rate: 3.44
   with_decay: true
   with_plasticity: true  
@@ -10,22 +10,26 @@ simulation:
   burnout: 8
   over: 
     #param_name: sc_matrix  # or 'param'
-    G:  # or 'param'
+    seed:  # or 'param'
       fun: "np.arange"
-      args: [0, 8.5, 0.5]      
+      #args: [1, 31, 1]      
+      args: [1, 16, 1]      
     # Alternative using custom function:
     # range: 
     #   fun: "np.logspace"
     #   args: [-1, 1, 32]  # 10^-1 to 10^1, 32 points
     
   parallel: true
+  averaged: true
 grid: 
   lrj:
     fun: "np.logspace"
-    args: [0, 3, 100]  # 10^0 to 10^2, 100 points
-  taoj:
-    fun: "np.logspace"
-    args: [2, 6, 110]  # 10^2 to 10^5, 110 points
+    args: [0, 5, 200]  # 10^0 to 10^4, 4 points
+    
+  G:
+    fun: "np.arange"
+    args: [0.1, 8.1, 0.05]  # 10^2 to 10^5, 110 points
+    
 data:  
   test_mode: false  
   max_subjects_test: 1
@@ -33,12 +37,12 @@ data:
 output:
   save_full_outputs: true  
   observables:
-    - name: mean
-      signal: rates
-    - name: fic_max_corr
-      signal: fic
+    - name: fc
+      signal: bold
+    - name: fcd
+      signal: bold
       
   
 experiment:
-  description: "Homeostatic grid for objective rate 3.44. Used to then calculate LR->DECAY coefficients. Now supports custom parameter generation functions."
-  version: "1.1"
+  description: "FC and FCD grid "
+  version: "1.0"

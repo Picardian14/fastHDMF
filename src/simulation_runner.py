@@ -51,7 +51,9 @@ class HDMFSimulationRunner:
             metadata_file=self.experiment_manager.current_config.get('data', {}).get('metadata', None),
             sc_root=self.experiment_manager.current_config.get('data', {}).get('sc_root', 'SCs')
         )
-        self.all_ipps = self.metadata['IPP'].tolist()        
+        self.all_ipps = self.metadata['IPP'].tolist()       
+        self.items = self.define_items_over(self.experiment_manager.current_config)
+        self.tasks = list(self.define_tasks_from_config(self.experiment_manager.current_config))  # keep as list; we need local_task_count 
 
     def _generate_parameter_values(self, spec: dict) -> np.ndarray:
         """Generate parameter values from spec with optional custom function"""
@@ -136,6 +138,7 @@ class HDMFSimulationRunner:
         params['nvc_match_slope'] = False # if using sigmoid, match slope at obj_rate
         params['nvc_k']          = 0.20    # maximum vasodilatory signal gain                    
         
+
         
         params["with_decay"] = task['with_decay']
         params["with_plasticity"] = task['with_plasticity']
@@ -172,7 +175,10 @@ class HDMFSimulationRunner:
             fname = project_root / "data" / "dyn_fics"  / f"mean_fic_G_{G_value}.npy"            
             J = np.load(fname)
             params['J'] = J
+
         params['TR'] = task['TR']
+        params['flp'] = task.get('flp', 0.008)
+        params['fhp'] = task.get('fhp', 0.09)
         
         # Neuromodulation
         if 'wgaine' in task:
@@ -247,7 +253,7 @@ class HDMFSimulationRunner:
             outputs['rates'] = rates_dyn
         if params.get('return_bold', True):
             bold_dyn = bold_dyn[:, config['simulation']['burnout']:]
-            bold_dyn = filter_bold(bold_dyn, flp=0.008, fhp=0.09, tr=params['TR'])            
+            bold_dyn = filter_bold(bold_dyn, flp=params['flp'], fhp=params['fhp'], tr=params['TR'])
             outputs['bold'] = bold_dyn
         if params.get('return_fic', True):
             fic_t_dyn = fic_t_dyn[:, int(config['simulation']['burnout'] * (params['TR'] / params['dtt'])):]
@@ -270,13 +276,13 @@ class HDMFSimulationRunner:
         sim = config.get("simulation", {})
         nb_steps = int(sim.get("nb_steps", 1000))
         parallel = bool(sim.get("parallel", False))
-        items = self.define_items_over(config)
-        n_items = len(items)        
+
+        n_items = len(self.items)
         log.info(f"Loaded {n_items} patients.")
 
         # --- Build tasks (Cartesian product + optional job slicing) ---
-        tasks = list(self.define_tasks_from_config(config))  # keep as list; we need local_task_count
-        local_task_count = len(tasks)
+
+        local_task_count = len(self.tasks)
         log.info(f"Local task count: {local_task_count}")
 
         axis_names = getattr(self, "_axis_names", [])
@@ -293,15 +299,21 @@ class HDMFSimulationRunner:
             """Create the grid on first use; then reuse (no temp rows)."""
             g = observable_grids.get(obs_key)
             if g is None:
-                g = np.empty((local_task_count, n_items), dtype=object)
-                g[:] = None  # explicit init
+                if sim.get('averaged', False):
+                    # You can average over the 'over' items and keep per subject simulations
+                    n_subjects = len(self.all_ipps)
+                    g = np.empty((local_task_count, 1), dtype=object)
+                    g[:] = None  # explicit init
+                else:
+                    g = np.empty((local_task_count, n_items), dtype=object)
+                    g[:] = None  # explicit init
                 observable_grids[obs_key] = g
             return g
 
         # Determine parallel job cap: use user-specified override if provided, else default 32
         max_jobs = getattr(self.experiment_manager, 'max_jobs', None)
         cap = max_jobs if (isinstance(max_jobs, int) and max_jobs > 0) else 32
-        n_jobs = min(len(items), min(cap, os.cpu_count() or 1))
+        n_jobs = min(len(self.items), min(cap, os.cpu_count() or 1))
         # --- Helpers ---
         def _run_one(current_task: Dict[str, Any], i: int, ipp: str, item_value: Any) -> Tuple[str, Optional[Dict[str, Any]]]:
             try:
@@ -323,27 +335,43 @@ class HDMFSimulationRunner:
                 return ipp, None
 
 
-        for t_idx, current_task in enumerate(tasks):
+        for t_idx, current_task in enumerate(self.tasks):
             log.info(f"[Task {t_idx+1}/{local_task_count}] {current_task}")
 
             # Run all patients for this task
             if parallel and n_jobs > 1:
                 pairs = Parallel(n_jobs=n_jobs, prefer="processes")(
-                    delayed(_run_one)(current_task, i, ipp, item) for i, (ipp, item) in enumerate(items)
+                    delayed(_run_one)(current_task, i, ipp, item) for i, (ipp, item) in enumerate(self.items)
                 )
             else:
-                pairs = [_run_one(current_task, i, ipp, item) for i, (ipp, item) in enumerate(items)]
-
-            # Write results directly into grids
-            for item_idx, out in pairs:
-                ipp = items[item_idx][0]
-                if out is None:
-                    failed_simulations.add(ipp)
-                    # leave cells as None for all observables
-                    continue
-                for obs_key, value in out.items():
-                    grid = get_grid(obs_key)
-                    grid[t_idx, item_idx] = value
+                pairs = [_run_one(current_task, i, ipp, item) for i, (ipp, item) in enumerate(self.items)]
+            
+            # write results directly into grids, with optional averaging
+            if sim.get('averaged', False):
+                # number of unique ipps (subjects) per averaged‐slot
+                n_subjects = len(self.all_ipps)
+                avg_n_items = len(self.items) // n_subjects
+                for item_idx, out in pairs:
+                    if out is None:
+                        continue
+                    # map item_idx → averaged‐slot index
+                    avg_idx = item_idx // avg_n_items
+                    for obs_key, value in out.items():
+                        grid = get_grid(obs_key)
+                        # accumulate fractionally to build the mean
+                        if grid[t_idx, avg_idx] is None:
+                            grid[t_idx, avg_idx] = value / avg_n_items
+                        else:
+                            grid[t_idx, avg_idx] += value / avg_n_items
+            else:
+                for item_idx, out in pairs:
+                    ipp = self.items[item_idx][0]
+                    if out is None:
+                        failed_simulations.add(ipp)
+                        continue
+                    for obs_key, value in out.items():
+                        grid = get_grid(obs_key)
+                        grid[t_idx, item_idx] = value
 
         # --- Package + save once ---
         axis_values_dict = {name: np.array(vals) for name, vals in zip(axis_names, axis_values)}
@@ -354,7 +382,7 @@ class HDMFSimulationRunner:
             "global_total_combos": global_total,
             "partition_strategy": "contiguous_by_job_id",
             "observables_spec": list(observable_grids.keys()),
-            "items": items,
+            "items": self.items,
         }
 
         results = {

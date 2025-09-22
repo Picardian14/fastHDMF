@@ -5,6 +5,8 @@ simulation:
   with_decay: false
   with_plasticity: false  
   TR: 2.4
+  flp: 0.01
+  fhp: 0.1
   burnout: 8
   alpha: 0.75
   over:     
