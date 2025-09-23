@@ -1,5 +1,10 @@
 .vscode/
+results/
+slurm/outputs/
+slurm/errors/
 data/
+setup.py
+*egg-link
 *.pkl
 *.out
 *.err
