@@ -130,4 +130,4 @@ read -rp "Press Enter to start local run..." _
 
 
 # Run the run_experiment.py script directly
-python3 src/run_experiment.py "$CONFIG_FILENAME" --cpus $CPUS_LOCAL
+python3 fastHDMF/run_experiment.py "$CONFIG_FILENAME" --cpus $CPUS_LOCAL

@@ -15,8 +15,8 @@ import numpy as np
 import re
 import psutil
 
-from src.observables import ObservablesPipeline
-from utils.calculate_grid_size import get_grid_size
+from .observables import ObservablesPipeline
+from .utils.calculate_grid_size import get_grid_size
 
 class ExperimentManager:
     """Manages HDMF experiments with configuration, logging, and result storage"""

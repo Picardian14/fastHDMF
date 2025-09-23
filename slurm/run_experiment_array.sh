@@ -31,4 +31,4 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 # Run Python script inside Singularity container with job info
-singularity exec $SINGULARITY_IMAGE bash -c "source /opt/anaconda/3/2023.07-2/base/etc/profile.d/conda.sh && conda activate fic && python3 src/run_experiment.py $CONFIG_FILENAME --job-id $SLURM_ARRAY_TASK_ID --job-count $JOB_COUNT --cpus $CPUS"
+singularity exec $SINGULARITY_IMAGE bash -c "source /opt/anaconda/3/2023.07-2/base/etc/profile.d/conda.sh && conda activate fic && python3 fastHDMF/run_experiment.py $CONFIG_FILENAME --job-id $SLURM_ARRAY_TASK_ID --job-count $JOB_COUNT --cpus $CPUS"

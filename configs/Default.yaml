@@ -5,8 +5,8 @@ simulation:
   with_decay: true
   with_plasticity: true  
   TR: 2.4
-flp: 0.01
-fhp: 0.1
+  flp: 0.01
+  fhp: 0.1
   burnout: 8
   lrj: 1.13
   G: 2.9    
@@ -16,7 +16,7 @@ fhp: 0.1
 data:  
   test_mode: false  
   max_subjects_test: 1
-  sc_root: "AAL"  
+  sc_root: "SCs"  
 output:
   save_full_outputs: true  
   observables:

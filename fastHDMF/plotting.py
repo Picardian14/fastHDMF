@@ -4,9 +4,9 @@ import warnings
 
 import numpy as np
 import matplotlib.pyplot as plt
-from src.experiment_manager import ExperimentManager
+from .experiment_manager import ExperimentManager
 try:
-    from utils.plotting import ResultsPlotter
+    from .utils.plotting import ResultsPlotter
 except ImportError as e:
     raise ImportError(
         "Failed to import ResultsPlotter from utils.plotting. "

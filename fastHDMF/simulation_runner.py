@@ -20,10 +20,10 @@ project_root = Path(__file__).parent.parent
 sys.path.insert(0, str(project_root))
 
 # Import modules
-from utils.data_loading import load_metadata, load_all_sc_matrices
-from src.experiment_manager import ExperimentManager
-from src.helper_functions import filter_bold
-from src.observables import ObservablesPipeline
+from .utils.data_loading import load_metadata, load_all_sc_matrices
+from .experiment_manager import ExperimentManager
+from .helper_functions import filter_bold
+from .observables import ObservablesPipeline
 
 # Import HDMF (assuming it's available in the environment)
 try:

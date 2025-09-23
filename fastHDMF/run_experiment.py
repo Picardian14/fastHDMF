@@ -12,8 +12,8 @@ from pathlib import Path
 project_root = Path(__file__).parent.parent
 sys.path.insert(0, str(project_root))
 
-from src.experiment_manager import ExperimentManager
-from src.simulation_runner import HDMFSimulationRunner
+from .experiment_manager import ExperimentManager
+from .simulation_runner import HDMFSimulationRunner
 def main():
     parser = argparse.ArgumentParser(description='Run HDMF experiment from config file')
     parser.add_argument('config', help='Config file name (e.g., "default_hdmf" or "experiments/high_coupling")')
