@@ -6,7 +6,7 @@ import sys
 import yaml
 import numpy as np
 from pathlib import Path
-DATAPATH = Path(__file__).parent.parent / "data" / "raw"
+DATAPATH = Path(__file__).parent.parent.parent / "data" / "raw"
 
 def get_grid_size(config_path,verbose=True):
     """Calculate total grid size from config file"""
@@ -94,7 +94,7 @@ def get_grid_size(config_path,verbose=True):
         sc_dir = Path(DATAPATH / sc_root)
         if sc_dir.exists() and sc_dir.is_dir():
             sc_files = list(sc_dir.glob('*.csv'))
-            sc_count = len(sc_files)
+            sc_count = len(sc_files) if not data_cfg.get("test_mode") else data_cfg.get("max_subjects_test")
         else:
             sc_count = 0
         if verbose:
@@ -114,7 +114,7 @@ def get_grid_size(config_path,verbose=True):
         sc_dir = Path(DATAPATH / sc_root)
         if sc_dir.exists() and sc_dir.is_dir():
             sc_files = list(sc_dir.glob('*.csv')) 
-            sc_count = len(sc_files)
+            sc_count = len(sc_files) if not data_cfg.get("test_mode") else data_cfg.get("max_subjects_test")
         else:
             sc_count = 0
         if verbose:

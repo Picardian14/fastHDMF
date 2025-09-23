@@ -44,6 +44,20 @@ class ExperimentManager:
                 job_count_str=str(job_count) if job_count is not None else None
             )
     
+    def integrate_local_results(self) -> None:
+        res = self.load_experiment_results()
+        full_results = res['full_results']
+        _,grid_shape = get_grid_size(self.current_config_path)
+        for k, data in full_results['observables'].items():
+            element_shape = data.flatten()[0].shape            
+            # combine grid dimensions with element dimensions
+            full_shape = tuple(grid_shape) + element_shape
+            full_results['observables'][k] = np.stack(data.flatten()).reshape(full_shape)
+        outp = self.experiment_dir / "full_results.pkl"
+        with open(outp, 'wb') as f:
+            pickle.dump(full_results, f)
+
+
     def integrate_slurm_results(self) -> Path:
         base_dir = self.experiment_dir
         if not base_dir.exists() or not base_dir.is_dir():
