@@ -1,0 +1,35 @@
+# Test parameter sweep - minimal example
+simulation:
+  nb_steps: 100000  # Shorter for testing
+  obj_rate: 3.44
+  nvc_sigmoid: false
+  with_decay: false
+  with_plasticity: false  
+  TR: 0.6
+  flp: 0.01
+  fhp: 0.1
+  burnout: 8       
+  parallel: true
+grid:
+  G:
+    fun: "np.arange"
+    args: [0.0, 2.4, 0.05]  # 
+  seed:
+    fun: "np.arange"
+    args: [1, 13, 1]
+
+data:  
+  test_mode: true  
+  max_subjects_test: 32
+  sc_root: "Skoch_SCs"  
+output:
+  save_full_outputs: true  
+  observables:    
+    - name: fc
+      signal: bold
+    - name: fc
+      signal: rates
+
+experiment:
+  description: "Sweep for G at different random seeds without NVC sigmoid"
+  version: "1.0"

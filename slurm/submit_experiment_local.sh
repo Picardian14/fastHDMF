@@ -2,12 +2,40 @@
 
 set -euo pipefail
 
-# Determine experiments directory (prefer ./experiments, fallback to ./configs/experiments)
-EXPERIMENTS_DIR="experiments"
+# Determine experiments directory (allow choosing any sub‐directory under ./configs)
+declare -a DIR_CHOICES=()
+# 1) if ./experiments exists, add it as an option
+if [ -d "experiments" ]; then
+    DIR_CHOICES+=("experiments")
+fi
+# 2) gather all subdirs under ./configs
+if [ -d "configs" ]; then
+    while IFS= read -r sub; do
+        DIR_CHOICES+=("configs/$sub")
+    done < <(find configs -mindepth 1 -maxdepth 1 -type d -printf '%f\n' | sort)
+fi
+
+if [ ${#DIR_CHOICES[@]} -eq 0 ]; then
+    echo "No valid experiment directories found (./experiments or subdirs under ./configs)." >&2
+    exit 1
+fi
+
+echo "Available experiment directories:"
+for i in "${!DIR_CHOICES[@]}"; do
+    echo "  $((i+1))) ${DIR_CHOICES[$i]}"
+done
+echo
+
+read -rp "Select directory by number or type path: " CHOICE
+if [[ "$CHOICE" =~ ^[0-9]+$ ]] && [ "$CHOICE" -ge 1 ] && [ "$CHOICE" -le "${#DIR_CHOICES[@]}" ]; then
+    EXPERIMENTS_DIR="${DIR_CHOICES[$((CHOICE-1))]}"
+else
+    EXPERIMENTS_DIR="$CHOICE"
+fi
+
 if [ ! -d "$EXPERIMENTS_DIR" ]; then
-    if [ -d "configs/experiments" ]; then
-        EXPERIMENTS_DIR="configs/experiments"
-    fi
+    echo "Directory '$EXPERIMENTS_DIR' not found." >&2
+    exit 1
 fi
 
 if [ ! -d "$EXPERIMENTS_DIR" ]; then
@@ -83,14 +111,6 @@ LOCAL_GRID_SIZE=$(echo "$LOCAL_GRID_INFO" | grep "Total grid combinations:" | aw
 echo
 echo "Grid size: $LOCAL_GRID_SIZE combinations"
 
-echo
-echo "Final configuration:"
-echo "  Experiment ID: $EXPERIMENT_ID"
-echo "  Config file: $CONFIG_FILENAME"
-echo "  Grid size: $LOCAL_GRID_SIZE"
-echo
-read -rp "Press Enter to start local run..." _
-
 # Prompt for cpus
 read -rp "Enter number of CPUs/workers (or press Enter for default): " USER_CPUS_LOCAL
 if [ -n "$USER_CPUS_LOCAL" ]; then
@@ -98,6 +118,16 @@ if [ -n "$USER_CPUS_LOCAL" ]; then
 else
     CPUS_LOCAL=1
 fi
+
+echo
+echo "Final configuration:"
+echo "  Experiment ID: $EXPERIMENT_ID"
+echo "  Config file: $CONFIG_FILENAME"
+echo "  Grid size: $LOCAL_GRID_SIZE"
+echo "  CPUs/workers: $CPUS_LOCAL"
+echo
+read -rp "Press Enter to start local run..." _
+
 
 # Run the run_experiment.py script directly
 python3 src/run_experiment.py "$CONFIG_FILENAME" --cpus $CPUS_LOCAL

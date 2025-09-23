@@ -118,7 +118,7 @@ class HDMFSimulationRunner:
 
 
 
-    def prepare_hdmf_params(self, task, seed=1):
+    def prepare_hdmf_params(self, task):
         """Prepare HDMF parameters from config and SC matrix"""
                
         # Base parameters
@@ -132,7 +132,7 @@ class HDMFSimulationRunner:
         # Configure from config file
         params['obj_rate'] = task['obj_rate']
         # NVC sigmoid option
-        params['nvc_sigmoid'] = True
+        params['nvc_sigmoid'] = task.get('nvc_sigmoid', True)
         params['nvc_r0']         =  params['obj_rate']  # baseline firing-rate
         params['nvc_u50']         = 12.0   # half-saturation (Hz): compression starts in this range
         params['nvc_match_slope'] = False # if using sigmoid, match slope at obj_rate
@@ -241,9 +241,9 @@ class HDMFSimulationRunner:
         return items
         
 
-    def run_one_simulation(self, task: dict, config: dict, nb_steps: int, seed: int = 1) -> dict:
+    def run_one_simulation(self, task: dict, config: dict, nb_steps: int) -> dict:
         """Run a single HDMF simulation with given SC matrix and task parameters"""
-        params = self.prepare_hdmf_params(task, seed=seed+1)
+        params = self.prepare_hdmf_params(task)
         # Run the simulation
         rates_dyn, _, bold_dyn, fic_t_dyn = dmf.run(params, nb_steps)
         outputs = {}
@@ -325,8 +325,7 @@ class HDMFSimulationRunner:
                 out = self.run_one_simulation(
                     task=thread_task,   # captured from loop below
                     config=config,
-                    nb_steps=nb_steps,
-                    seed=i + 1,
+                    nb_steps=nb_steps
                 )
                 # expected: dict {obs_key: value}
                 return i, out

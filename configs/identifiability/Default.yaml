@@ -1,0 +1,31 @@
+# Test parameter sweep - minimal example
+simulation:
+  nb_steps: 50000  # Shorter for testing
+  obj_rate: 3.44
+  with_decay: true
+  with_plasticity: true  
+  TR: 0.6
+  flp: 0.01
+  fhp: 0.1
+  burnout: 8
+  lrj: 1.13
+  G: 2.91   
+  parallel: true
+  seed: 1
+
+data:  
+  test_mode: false  
+  max_subjects_test: 1
+  sc_root: "Skoch_SCs"  
+output:
+  save_full_outputs: true  
+  observables:    
+    - name: fc
+      signal: bold
+    
+    
+      
+  
+experiment:
+  description: "A grid where you run different seeds"
+  version: "1.0"
