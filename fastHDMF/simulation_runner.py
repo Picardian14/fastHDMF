@@ -35,25 +35,25 @@ except ImportError:
 class HDMFSimulationRunner:
     """Runs HDMF simulations with experiment management"""
 
-    def __init__(self, project_root: Path, experiment_manager: ExperimentManager, observables: Optional[ObservablesPipeline] = None):
-        self.project_root = project_root
-        self.experiment_manager = experiment_manager
+    def __init__(self, experiment_manager: ExperimentManager, observables: Optional[ObservablesPipeline] = None):        
+        self.exp = experiment_manager
         # Prefer pipeline from ExperimentManager; allow explicit override
         if observables is not None:
             self.observables = observables
-        elif getattr(self.experiment_manager, "observables", None) is not None:
-            self.observables = self.experiment_manager.observables
+        elif getattr(self.exp, "observables", None) is not None:
+            self.observables = self.exp.observables
         else:
             self.observables = ObservablesPipeline.default()
-
-        # Load patient data once
-        self.metadata = load_metadata(
-            metadata_file=self.experiment_manager.current_config.get('data', {}).get('metadata', None),
-            sc_root=self.experiment_manager.current_config.get('data', {}).get('sc_root', 'SCs')
-        )
-        self.all_ipps = self.metadata['IPP'].tolist()       
-        self.items = self.define_items_over(self.experiment_manager.current_config)
-        self.tasks = list(self.define_tasks_from_config(self.experiment_manager.current_config))  # keep as list; we need local_task_count 
+           
+        # Items is the cartesian products between SC matrices to process and paremeter values that you can parallelize over
+        self.items = self.define_items_over(self.exp.current_config)
+        # Tasks is how the parameters for the model are constructed. If not grid is defined, it will just have the main parameters that will be configured for the simulation
+        self.tasks = list(self.define_tasks_from_config(self.exp.current_config))
+        
+    @property
+    def all_ipps(self):
+        """Return list of all subject IDs"""
+        return list(self.exp.sc_matrices.keys()) 
 
     def _generate_parameter_values(self, spec: dict) -> np.ndarray:
         """Generate parameter values from spec with optional custom function"""
@@ -103,8 +103,8 @@ class HDMFSimulationRunner:
         self._axis_values = axis_values
         self._global_total_combos = int(np.prod([len(v) for v in axis_values]))
 
-        job_id   = getattr(self.experiment_manager, 'job_id', None)
-        job_count = getattr(self.experiment_manager, 'job_count', None)
+        job_id   = getattr(self.exp, 'job_id', None)
+        job_count = getattr(self.exp, 'job_count', None)
 
         combo_iter = product(*axis_values)
         if job_id is not None and job_count is not None:
@@ -138,7 +138,6 @@ class HDMFSimulationRunner:
         params['nvc_match_slope'] = False # if using sigmoid, match slope at obj_rate
         params['nvc_k']          = 0.20    # maximum vasodilatory signal gain                    
         
-
         
         params["with_decay"] = task['with_decay']
         params["with_plasticity"] = task['with_plasticity']
@@ -147,13 +146,13 @@ class HDMFSimulationRunner:
             LR = task['lrj']
             if 'taoj' not in task:
                 # Load homeostatic parameters
-                fit_res_path = Path(__file__).parent.parent / "data" / "fit_res_3-44.npy"
-                self.experiment_manager.logger.info(f"Loading homeostatic fit results from {fit_res_path}")
+                fit_res_path = self.exp.data_dir / "LinearCoeffs" / f"{self.exp.current_config['data']['sc_root']}_fit_res_{str(params['obj_rate']).replace('.', '-')}.npy"
+                self.exp.logger.info(f"Loading homeostatic fit results from {fit_res_path}")
                 fit_res = np.load(str(fit_res_path))
                 b = fit_res[0]
                 a = fit_res[1]
                 DECAY = np.exp(a + np.log(LR) * b) if task['with_decay'] else 0
-                self.experiment_manager.logger.info(f"Setting homeostatic DECAY={DECAY:.5f} for LR={LR:.5f}")
+                self.exp.logger.info(f"Setting homeostatic DECAY={DECAY:.5f} for LR={LR:.5f}")
             else:
                 DECAY = task['taoj']
 
@@ -170,7 +169,7 @@ class HDMFSimulationRunner:
             params['alpha'] = 0.75
             params['J'] = params['alpha'] * params['G'] * params['C'].sum(axis=0).squeeze() + 1
         if 'mixed' in task: # Only for mixed cases where you want to load a prespecified FIC vector
-            self.experiment_manager.logger.info("Loading FIC vector for mixed stability task")
+            self.exp.logger.info("Loading FIC vector for mixed stability task")
             G_value = f"{params['G']:.2f}".replace('.', '')
             fname = project_root / "data" / "dyn_fics"  / f"mean_fic_G_{G_value}.npy"            
             J = np.load(fname)
@@ -179,6 +178,8 @@ class HDMFSimulationRunner:
         params['TR'] = task['TR']
         params['flp'] = task.get('flp', 0.008)
         params['fhp'] = task.get('fhp', 0.09)
+        params['burnout'] = task.get('burnout', 8)  # in volumes (TRs)
+        params['nb_steps'] = task.get('nb_steps', 50000)
         
         # Neuromodulation
         if 'wgaine' in task:
@@ -201,18 +202,20 @@ class HDMFSimulationRunner:
     def define_items_over(self, config: dict):
         """
         Define items over to process with a given task. Can be or not parallelized.
+        Generally, if no 'over' is specified, just each item would be one SC matrix (subject).
+        If 'over' is specified, it should be a single parameter to iterate over (e.g. G, lrj, alpha, etc).
+        In that case, each item is a combination of (subject, param_value) generating a Cartesian product.
         Returns a list of (ipp, item) tuples where item contains sc_matrix and parameter values.
         """
         sim = config.get("simulation", {})
-        over_config = sim.get('over')
-        sc_root = config.get('data', {}).get('sc_root', 'SCs')
+        over_config = sim.get('over')        
         
         # Load SC matrices based on test mode
         if config['data']['test_mode']:
-            test_ipps = self.all_ipps[:config['data'].get('max_subjects_test', 2)]
-            sc_matrices = load_all_sc_matrices(test_ipps, sc_root=sc_root)
+            max_subs = config['data'].get('max_subjects_test', 2)
+            sc_matrices = dict(islice(self.exp.sc_matrices.items(), max_subs))                            
         else:
-            sc_matrices = load_all_sc_matrices(self.all_ipps, sc_root=sc_root)
+            sc_matrices = self.exp.sc_matrices
         
         items = []
         
@@ -232,7 +235,7 @@ class HDMFSimulationRunner:
                 for param_value in param_values:
                     item = {
                         'sc_matrix': sc_matrix,
-                        'param_key': param_name,
+                        'param_key': param_name, # Get the name of the parameter as it is passed to the model
                         'param_value': param_value
 
                     }
@@ -241,25 +244,25 @@ class HDMFSimulationRunner:
         return items
         
 
-    def run_one_simulation(self, task: dict, config: dict, nb_steps: int) -> dict:
+    def run_one_simulation(self, task: dict) -> dict:
         """Run a single HDMF simulation with given SC matrix and task parameters"""
         params = self.prepare_hdmf_params(task)
         # Run the simulation
-        rates_dyn, _, bold_dyn, fic_t_dyn = dmf.run(params, nb_steps)
+        rates_dyn, _, bold_dyn, fic_t_dyn = dmf.run(params, params['nb_steps'])
         outputs = {}
         # Minimal processing on outputs
         if params.get('return_rate', True):
-            rates_dyn = rates_dyn[:, int(config['simulation']['burnout'] * (params['TR'] / params['dtt'])):]            
+            rates_dyn = rates_dyn[:, int(params['burnout'] * (params['TR'] / params['dtt'])):]            
             outputs['rates'] = rates_dyn
         if params.get('return_bold', True):
-            bold_dyn = bold_dyn[:, config['simulation']['burnout']:]
+            bold_dyn = bold_dyn[:, params['burnout']:]
             bold_dyn = filter_bold(bold_dyn, flp=params['flp'], fhp=params['fhp'], tr=params['TR'])
             outputs['bold'] = bold_dyn
         if params.get('return_fic', True):
-            fic_t_dyn = fic_t_dyn[:, int(config['simulation']['burnout'] * (params['TR'] / params['dtt'])):]
+            fic_t_dyn = fic_t_dyn[:, int(params['burnout'] * (params['TR'] / params['dtt'])):]
             outputs['fic'] = fic_t_dyn
         # Once desired variables are ready to be observed, compute observables
-        obs_dict = self.observables.compute(outputs, params, config)
+        obs_dict = self.observables.compute(outputs, params)
         return obs_dict
 
     def run_experiment(self):
@@ -270,11 +273,10 @@ class HDMFSimulationRunner:
         - Write each observable directly into its preallocated grid at [task_idx, patient_idx]
         - Save once
         """
-        em = self.experiment_manager
+        em = self.exp
         log = em.logger
         config = em.current_config
-        sim = config.get("simulation", {})
-        nb_steps = int(sim.get("nb_steps", 1000))
+        sim = config.get("simulation", {})        
         parallel = bool(sim.get("parallel", False))
 
         n_items = len(self.items)
@@ -311,11 +313,11 @@ class HDMFSimulationRunner:
             return g
 
         # Determine parallel job cap: use user-specified override if provided, else default 32
-        max_jobs = getattr(self.experiment_manager, 'max_jobs', None)
+        max_jobs = getattr(self.exp, 'max_jobs', None)
         cap = max_jobs if (isinstance(max_jobs, int) and max_jobs > 0) else 32
         n_jobs = min(len(self.items), min(cap, os.cpu_count() or 1))
         # --- Helpers ---
-        def _run_one(current_task: Dict[str, Any], i: int, ipp: str, item_value: Any) -> Tuple[str, Optional[Dict[str, Any]]]:
+        def _run_one(current_task: Dict[str, Any], i: int, ipp: str, item_value: Any) -> Tuple[int, Optional[Dict[str, Any]]]:
             try:
                 # If there is a param to iterate over, set it here
                 thread_task = current_task.copy()  # capture current task from outer loop
@@ -323,15 +325,13 @@ class HDMFSimulationRunner:
                 if item_value.get('param_key') is not None:
                     thread_task[item_value['param_key']] = item_value['param_value']
                 out = self.run_one_simulation(
-                    task=thread_task,   # captured from loop below
-                    config=config,
-                    nb_steps=nb_steps
+                    task=thread_task,   # captured from loop below                    
                 )
                 # expected: dict {obs_key: value}
                 return i, out
             except Exception as e:
                 log.error(f"[{ipp}] simulation failed: {e}")
-                return ipp, None
+                return i, None
 
 
         for t_idx, current_task in enumerate(self.tasks):
@@ -364,8 +364,8 @@ class HDMFSimulationRunner:
                             grid[t_idx, avg_idx] += value / avg_n_items
             else:
                 for item_idx, out in pairs:
-                    ipp = self.items[item_idx][0]
                     if out is None:
+                        ipp = self.items[item_idx][0]
                         failed_simulations.add(ipp)
                         continue
                     for obs_key, value in out.items():

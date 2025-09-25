@@ -6,7 +6,7 @@ import sys
 import yaml
 import numpy as np
 from pathlib import Path
-DATAPATH = Path(__file__).parent.parent.parent / "data" / "raw"
+DATAPATH = Path(__file__).parent.parent.parent / "data" / "SCs"
 
 def get_grid_size(config_path,verbose=True):
     """Calculate total grid size from config file"""

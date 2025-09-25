@@ -1,6 +1,6 @@
 # Test parameter sweep - minimal example
 simulation:
-  nb_steps: 400000  # Shorter for testing
+  nb_steps: 50000  # Shorter for testing
   obj_rate: 3.44
   with_decay: true
   with_plasticity: true  
@@ -16,9 +16,9 @@ simulation:
 data:  
   test_mode: false  
   max_subjects_test: 1
-  sc_root: "SCs"  
+  sc_root: "AAL"  
 output:
-  save_full_outputs: true  
+  save_full_outputs: false  
   observables:
     - name: raw
       signal: rates
@@ -32,5 +32,5 @@ output:
       
   
 experiment:
-  description: "Showing firing rate stability across G values in the dynamic model"
-  version: "1.1"
+  description: "State-of-the-art DMF simulation with default parameters"
+  version: "1.0"

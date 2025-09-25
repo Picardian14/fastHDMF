@@ -17,13 +17,15 @@ import psutil
 
 from .observables import ObservablesPipeline
 from .utils.calculate_grid_size import get_grid_size
+from .utils.data_loading import load_metadata, load_all_sc_matrices
 
 class ExperimentManager:
     """Manages HDMF experiments with configuration, logging, and result storage"""
     
-    def __init__(self, project_root: Path, config_path: str, results_dir: Optional[Path] = None, job_id: Optional[int] = None, job_count: Optional[int] = None):
-        self.project_root = Path(project_root)
-        self.configs_dir = self.project_root / "configs"
+    def __init__(self, project_root: Optional[Path], config_path: str, results_dir: Optional[Path] = None, job_id: Optional[int] = None, job_count: Optional[int] = None):
+        self.project_root = Path(project_root) if project_root else "/network/iss/home/ivan.mindlin/Repos/fastHDMF" # project root should have at least data/ and configs/
+        self.configs_dir = self.project_root / "configs" 
+        self.data_dir = self.project_root / "data"  # data directory
         # unified results directory
         self.results_dir = Path(results_dir) if results_dir else (self.project_root / "results")
         self.results_dir.mkdir(parents=True, exist_ok=True)
@@ -43,6 +45,18 @@ class ExperimentManager:
                 job_id=str(job_id) if job_id is not None else None,
                 job_count_str=str(job_count) if job_count is not None else None
             )
+        # Load patient data once
+        self.metadata = load_metadata(
+            datapath=self.data_dir,
+            metadata_file=self.current_config.get('data', {}).get('metadata', None),
+            sc_root=self.current_config.get('data', {}).get('sc_root', 'SCs')
+        )
+        self.all_ipps = self.metadata['IPP'].tolist() 
+        self.sc_matrices = load_all_sc_matrices(
+            ipp_list=self.all_ipps,
+            datapath=self.data_dir,
+            sc_root=self.current_config.get('data', {}).get('sc_root', 'SCs'),
+        ) if not self.metadata.empty else {}
     
     def integrate_local_results(self) -> None:
         res = self.load_experiment_results()

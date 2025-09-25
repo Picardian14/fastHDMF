@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import Dict, List, Tuple, Union
 
 # Project constants following your existing patterns
-PROJECT_ROOT = Path(__file__).parent.parent
+PROJECT_ROOT = Path(__file__).parent.parent.parent
 DATAPATH = os.path.join(PROJECT_ROOT, "data")
 RESULTS_DIR = os.path.join(PROJECT_ROOT, "results")
 
@@ -28,7 +28,7 @@ def load_metadata(
         Columns to extract from metadata. If None and metadata_file is provided, returns all columns.
         If metadata_file is None, this parameter is ignored.
     sc_root : str, optional
-        SC folder name under data/raw/ (should come from config file). Required when metadata_file is None.
+        SC folder name under data/SCs/ (should come from config file). Required when metadata_file is None.
         
     Returns
     -------
@@ -62,7 +62,7 @@ def load_metadata(
         raise ValueError("sc_root must be provided when no metadata file is available (should come from config)")
     
     print(f"Creating IPP list from SC matrices in: {sc_root}")
-    sc_dir = os.path.join(datapath, "raw", sc_root)
+    sc_dir = os.path.join(datapath, "SCs", sc_root)
     
     if not os.path.exists(sc_dir):
         raise FileNotFoundError(f"SC directory not found: {sc_dir}")
@@ -124,14 +124,14 @@ def load_sc_matrix(
     datapath : str
         Base data directory.
     sc_root : str
-        SC folder name under data/raw/ (should come from config file).
+        SC folder name under data/SCs/ (should come from config file).
     normalize : bool
         Whether to apply max-normalization.
     """
     if sc_root is None:
         raise ValueError("sc_root must be provided (should come from config)")
     
-    sc_dir = os.path.join(datapath, "raw", sc_root)
+    sc_dir = os.path.join(datapath, "SCs", sc_root)
     
     # First check if CSV is directly in sc_root
     direct_path = os.path.join(sc_dir, f"{ipp}.csv")
@@ -169,7 +169,7 @@ def load_all_sc_matrices(
     datapath : str
         Base data directory.
     sc_root : str
-        SC folder name under data/raw/ (should come from config file).
+        SC folder name under data/SCs/ (should come from config file).
     """
     if sc_root is None:
         raise ValueError("sc_root must be provided (should come from config)")
@@ -185,7 +185,7 @@ def load_all_sc_matrices(
 def load_bootstrapped_matrices(datapath: str = DATAPATH, nregions: int = 100) -> Dict[str, np.ndarray]:
     """Load bootstrap SC matrices following project preprocessing patterns"""
     bootstrapped_patients = {}
-    bootstrap_dir = os.path.join(datapath,"raw", "Bootstrapped_SCs")
+    bootstrap_dir = os.path.join(datapath,"SCs", "Bootstrapped_SCs")
 
     for patient_folder in os.listdir(bootstrap_dir):
         folder_path = os.path.join(bootstrap_dir, patient_folder)
@@ -218,7 +218,7 @@ def get_scanner_mapping(
     if sc_root is None:
         raise ValueError("sc_root must be provided (should come from config)")
         
-    sc_dir = os.path.join(datapath, "raw", sc_root)
+    sc_dir = os.path.join(datapath, "SCs", sc_root)
     scanner_map: Dict[str, str] = {}
     
     if not os.path.exists(sc_dir):
